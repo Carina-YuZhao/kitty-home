@@ -476,7 +476,9 @@ const I18N = {
   zh: { title: '猫猫小屋', sub: '初夏 · 晴', routine: '猫猫的作息', breakfast: '早饭', lunch: '午饭', dinner: '晚饭',
         bed: '睡觉', groom: '舔毛', random: '随机', about: '约 ', preview: '时间预览', back: '回到现在', now: '现在',
         cat: '猫猫', walking: '猫猫正在走过去…', sleep: '在床上睡觉，晚安', eat: n => `在吃${n}`, wait: n => `蹲在碗边等${n}`,
-        playing: { yarn: '在追毛线球！', wand: '在扑逗猫棒上的羽毛！', box: '钻进了纸箱，只露出一个脑袋', bubble: '在拍泡泡', fireworks: '坐在书房窗台上看烟花 🎆' },
+        playing: { yarn: '在追毛线球！', wand: '在扑逗猫棒上的羽毛！', box: '钻进了纸箱，只露出一个脑袋', bubble: '在拍泡泡', fireworks: '坐在书房窗台上看烟花 🎆',
+          tree: '爬到了外面的树上，坐在树梢吹风 ✨', roof: '跑上了屋顶，舔舔毛、打个盹 ✨',
+          butterfly: '在草地上追蝴蝶 ✨', pounce: sea => sea === 'winter' ? '在雪地里扑雪堆 ✨' : '在草丛里扑小虫子 ✨' },
         left: s => `（还剩 ${s} 秒）`,
         party: ['🎉 今天的任务全部完成！小屋挂上了彩旗', '🎉 今天的任务全部完成！餐桌上多了一束向日葵', '🎉 今天的任务全部完成！椅子上绑了一串气球'],
         grooming: '在舔毛，认真打理自己', toilet: '上厕所', toiletWhen: '每天 4 次',
@@ -485,7 +487,9 @@ const I18N = {
   en: { title: 'Cat Cottage', sub: 'Early summer · Sunny', routine: "The cat's day", breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
         bed: 'Bedtime', groom: 'Grooming', random: 'Random', about: '~', preview: 'Preview time', back: 'Back to now', now: 'Now',
         cat: 'The cat ', walking: 'The cat is on its way…', sleep: 'is asleep in bed. Good night', eat: n => `is having ${n.toLowerCase()}`,
-        playing: { yarn: 'is chasing a ball of yarn!', wand: 'is pouncing on the feather wand!', box: 'has squeezed into a box, only its head poking out', bubble: 'is batting at bubbles', fireworks: 'is on the study windowsill watching fireworks 🎆' },
+        playing: { yarn: 'is chasing a ball of yarn!', wand: 'is pouncing on the feather wand!', box: 'has squeezed into a box, only its head poking out', bubble: 'is batting at bubbles', fireworks: 'is on the study windowsill watching fireworks 🎆',
+          tree: 'has climbed the tree outside and is enjoying the breeze ✨', roof: 'is up on the roof, grooming and dozing ✨',
+          butterfly: 'is chasing a butterfly across the lawn ✨', pounce: sea => sea === 'winter' ? 'is pouncing on snow piles ✨' : 'is pouncing on bugs in the grass ✨' },
         left: s => ` (${s}s left)`,
         party: ["🎉 All of today's tasks done! Bunting is up in the cottage", "🎉 All of today's tasks done! Sunflowers on the dining table", "🎉 All of today's tasks done! Balloons tied to a chair"],
         wait: n => `is waiting by the bowl for ${n.toLowerCase()}`, grooming: 'is grooming, very thoroughly',
@@ -587,7 +591,7 @@ const hhmm = m => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(
 const dateEl = $('date');
 // ---- 陪猫玩：积分在 bot 那边扣，bot 给的链接带 ?play=玩法&until=结束时间 ----
 const QS = (() => { try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(); } })();
-let playKind = ['yarn', 'wand', 'box', 'bubble', 'fireworks'].includes(QS.get('play')) ? QS.get('play') : null;
+let playKind = ['yarn', 'wand', 'box', 'bubble', 'fireworks', 'tree', 'roof', 'butterfly', 'pounce'].includes(QS.get('play')) ? QS.get('play') : null;
 let playUntil = playKind ? (parseInt(QS.get('until'), 10) || 0) * 1000 : 0;
 if (playUntil > Date.now() + 70000) playUntil = Date.now() + 60000;  // clock skew guard: never more than ~1 minute
 function playLeft() { return playKind && Date.now() < playUntil ? Math.ceil((playUntil - Date.now()) / 1000) : 0; }
@@ -625,22 +629,105 @@ function drawFireworks(t) {
   }
 }
 
+// Irregular motion: a chain of random moves, each with its own target, length and pace (some are pauses).
+// Returns [position, velocity]. Deterministic per seed so it never jumps between frames.
+const _wcache = {};
+function wander(seed, t, lo, hi, dmin, dmax, pauseP) {
+  let segs = _wcache[seed];
+  if (!segs) {
+    segs = []; const r = rng(seed); let tt = 0, x = (lo + hi) / 2;
+    while (tt < 400) {
+      const d = dmin + r() * (dmax - dmin);
+      let nx = r() < pauseP ? x : lo + r() * (hi - lo);
+      if (nx !== x && Math.abs(nx - x) < 6) nx = x + (nx > x ? 6 : -6);
+      nx = Math.max(lo, Math.min(hi, nx));
+      segs.push([tt, tt + d, x, nx]); x = nx; tt += d;
+    }
+    _wcache[seed] = segs;
+  }
+  const tm = ((t % 400) + 400) % 400;
+  let a = 0, b = segs.length - 1;
+  while (a < b) { const mid = (a + b + 1) >> 1; if (segs[mid][0] <= tm) a = mid; else b = mid - 1; }
+  const [t0, t1, x0, x1] = segs[a], u = (tm - t0) / (t1 - t0), e = u * u * (3 - 2 * u);
+  return [x0 + (x1 - x0) * e, (x1 - x0) * 6 * u * (1 - u) / (t1 - t0)];
+}
+// random jump times for the feather wand: [start, height]
+const JUMPS = (() => { const r = rng(51), out = []; let tt = 0.4; while (tt < 400) { out.push([tt, 5 + r() * 7]); tt += 0.55 + r() * 1.9; } return out; })();
+function jumpAt(t) {
+  const tm = ((t % 400) + 400) % 400;
+  let a = 0, b = JUMPS.length - 1;
+  while (a < b) { const mid = (a + b + 1) >> 1; if (JUMPS[mid][0] <= tm) a = mid; else b = mid - 1; }
+  const [st, h] = JUMPS[a], k = (tm - st) / 0.45;
+  return k >= 0 && k < 1 ? Math.round(Math.sin(k * Math.PI) * h) : 0;
+}
+let yarnDir = 1;
+
+const zzz = (x, y, t) => { for (let i = 0; i < 3; i++) { const p = (t * 0.35 + i / 3) % 1; g.globalAlpha = 1 - p;
+  const zx = x + p * 6, zy = y - p * 10; R(zx, zy, 3, 1, '#f6f1ff'); R(zx + 1, zy + 1, 1, 1, '#f6f1ff'); R(zx, zy + 2, 3, 1, '#f6f1ff'); } g.globalAlpha = 1; };
+
 function drawPlay(kind, t) {
+  if (kind === 'tree') {           // up in the tree outside (right-hand tree, crown top ≈ y108); a little bird hops nearby
+    // tree crown spans x 209–231, top at y≈108; the cat sits in the middle of it, leaves in front of its feet
+    const pos = drawCat(188, 66, -1, Math.floor(t / 6) % 3 === 2 ? 'groom' : 'sit', Math.floor(t * 2) % 2, 1);
+    if (P.leaf) { O(210, 112, 21, 3, P.leaf); O(212, 111, 3, 1, P.leafLt); O(224, 111, 4, 1, P.leafLt); O(211, 115, 19, 2, P.leafDk); }
+    else { O(212, 113, 18, 1, '#6e4a30'); O(214, 112, 6, 1, '#ffffff'); }        // winter: a bare branch with snow
+    const hop = Math.abs(Math.sin(t * 2.2)) < 0.25 ? 1 : 0, bx = 226 + Math.round(Math.sin(t * 0.4) * 2);
+    O(bx, 109 - hop, 3, 2, '#7a5a8a'); O(bx + 3, 109 - hop, 1, 1, '#f2b33a'); O(bx - 1, 108 - hop, 1, 1, '#5a3a6a'); O(bx + 1, 108 - hop, 1, 1, '#9a7aaa');
+    return pos;
+  }
+  if (kind === 'roof') {           // on the roof ridge: groom for a while, then doze, then groom again
+    const napping = Math.floor(t / 12) % 2 === 1;
+    const pos = drawCat(82, -28, 1, napping ? 'sleep' : (Math.floor(t * 2) % 2 ? 'groom' : 'sit'), napping ? Math.floor(t * 0.7) % 2 : Math.floor(t * 2) % 2, 1);
+    if (napping) zzz(pos[0] + 11, pos[1] - 1, t);
+    return pos;
+  }
+  if (kind === 'butterfly') {      // a butterfly zig-zags over the lawn; the cat trots after it and leaps now and then
+    const bx = wander(61, t, 50, 205, 0.35, 1.3, 0.05)[0], by = wander(67, t, 140, 156, 0.3, 0.9, 0.1)[0];
+    const [cx, v] = wander(61, t - 0.45, 50, 205, 0.35, 1.3, 0.05), dir = v >= 0 ? 1 : -1, up = jumpAt(t * 0.8);
+    const fl = Math.floor(t * 9) % 2;
+    R(bx, by - 1, 1, 4, '#3a2a1a');
+    if (fl) { R(bx - 3, by - 2, 3, 3, '#ffd23a'); R(bx + 1, by - 2, 3, 3, '#ffd23a'); R(bx - 3, by - 2, 1, 1, '#e8873a'); R(bx + 3, by - 2, 1, 1, '#e8873a'); }
+    else { R(bx - 3, by + 1, 3, 2, '#ffd23a'); R(bx + 1, by + 1, 3, 2, '#ffd23a'); }
+    return drawCat(cx - HX - 7, 114 - up, dir, Math.abs(v) > 4 || up ? 'walk' : 'sit', Math.floor(t * 7) % 2, 1);
+  }
+  if (kind === 'pounce') {         // crouch, wiggle, POUNCE; the bug hops away (in winter: a puff of snow)
+    const PER = 2.6, c = Math.floor(t / PER), ph = (t / PER) % 1, r = rng(c * 19 + 7);
+    const startX = 70 + Math.floor(r() * 110), dir = r() < 0.5 ? 1 : -1, land = startX + dir * 16;
+    let x = startX, up = 0, pose = 'sit';
+    if (ph >= 0.45 && ph < 0.65) { const k = (ph - 0.45) / 0.2; x = startX + dir * 16 * k; up = Math.round(Math.sin(k * Math.PI) * 9); pose = 'walk'; }
+    else if (ph >= 0.65) x = land;
+    const wiggle = ph > 0.25 && ph < 0.45 ? (Math.floor(t * 14) % 2) : 0;
+    const bugX = land + dir * 7, winter = SEASON === 'winter';
+    const bug = (x, y) => { R(x, y, 3, 2, '#3fbf2a'); R(x + (dir > 0 ? 3 : -1), y - 1, 1, 1, '#2a8a1a'); R(x - (dir > 0 ? 1 : -3), y + 1, 1, 1, '#2a8a1a'); };
+    if (!winter && ph < 0.6) bug(HX + bugX, 158);                                                                     // the bug
+    if (!winter && ph >= 0.6) { const k = Math.min(1, (ph - 0.6) / 0.25); bug(HX + bugX + dir * 18 * k, 158 - Math.round(Math.sin(k * Math.PI) * 10)); } // hops away
+    if (winter && ph < 0.62) { R(HX + bugX - 4, 159, 9, 1, '#b9c8d4'); R(HX + bugX - 3, 156, 7, 3, '#ffffff'); R(HX + bugX - 2, 155, 5, 1, '#ffffff'); R(HX + bugX + 2, 157, 2, 2, '#dde6ee'); } // snow pile with shadow
+    if (ph >= 0.63 && ph < 0.85) {   // landing puff: grass bits or snow
+      const k = (ph - 0.63) / 0.22; g.globalAlpha = 1 - k;
+      [[-4, -2], [-2, -5], [1, -6], [4, -3], [6, -1], [-6, -1]].forEach(([dx, dy]) => R(HX + land + 7 + dx * (1 + k), HY + 112 + dy * (1 + k), 1, 1, winter ? '#ffffff' : '#7fbf5f'));
+      g.globalAlpha = 1;
+    }
+    return drawCat(x, 113 - up + (wiggle ? 0 : 0), dir, pose, wiggle, 1);
+  }
   if (kind === 'fireworks') return drawCat(119, 25, 1, 'sit', 0, 1);   // sitting on the study windowsill
-  if (kind === 'yarn') {           // a ball of yarn rolls back and forth across the kitchen floor
-    const bx = 90 + 17 * Math.sin(t * 1.1), dir = Math.cos(t * 1.1) >= 0 ? 1 : -1; // cat stays between x 57 and 123
+  if (kind === 'yarn') {           // the ball rolls off in random directions at random speeds, sometimes stopping
+    const [bx, v] = wander(11, t, 74, 106, 0.45, 2.2, 0.15);
+    if (Math.abs(v) > 2) yarnDir = v > 0 ? 1 : -1;
+    const dir = yarnDir, moving = Math.abs(v) > 3;
     for (let k = 1; k < 6; k++) L(Math.round(bx - dir * k * 2), 89, 1, 1, '#f28fb0');
     L(Math.round(bx) - 1, 86, 3, 3, '#e8584a'); L(Math.round(bx), 86, 1, 1, '#f28fb0'); L(Math.round(bx) - 1, 87, 1, 1, '#c0402a');
-    return drawCat(dir > 0 ? bx - 16 : bx + 2, 90, dir, 'walk', Math.floor(t * 7) % 2, 1);
+    const step = Math.floor(t * (4 + Math.min(10, Math.abs(v) * 0.25))) % 2;  // legs move faster when the ball is fast
+    return drawCat(dir > 0 ? bx - 16 : bx + 2, 90, dir, moving ? 'walk' : 'sit', step, 1);
   }
-  if (kind === 'wand') {           // a feather on a string swings from the ceiling; the cat leaps for it
+  if (kind === 'wand') {           // the feather darts about unpredictably; the cat lags a beat and leaps at random moments
     const AX = 74; // anchor on the ceiling, a little to the right of the food bowls
-    const fx = Math.round(AX + 6 * Math.sin(t * 2.3)), fy = Math.round(68 + 4 * Math.sin(t * 3.1));
+    const fx = Math.round(wander(23, t, AX - 9, AX + 9, 0.25, 1.1, 0.12)[0]);
+    const fy = Math.round(wander(37, t, 61, 72, 0.3, 1.0, 0.2)[0]);
     L(AX - 1, 50, 3, 1, '#5a3a26');
     for (let k = 0; k <= 12; k++) L(Math.round(AX + (fx - AX) * k / 12), Math.round(51 + (fy - 51) * k / 12), 1, 1, '#7a5236');
     L(fx - 1, fy, 3, 2, '#c9a0f0'); L(fx, fy + 2, 1, 2, '#f28fb0'); L(fx - 2, fy + 1, 1, 1, '#c9a0f0');
-    const ph = (t * 0.9) % 1, up = ph < 0.3 ? Math.round(Math.sin(ph / 0.3 * Math.PI) * 8) : 0;
-    return drawCat(fx - 9, 90 - up, 1, up ? 'walk' : 'sit', 0, 1);
+    const catX = wander(23, t - 0.3, AX - 9, AX + 9, 0.25, 1.1, 0.12)[0] - 9, up = jumpAt(t);
+    return drawCat(catX, 90 - up, 1, up ? 'walk' : 'sit', 0, 1);
   }
   if (kind === 'box') {            // a cardboard box on the bedroom rug; the cat ducks in and peeks out
     const peek = Math.sin(t * 1.4) > -0.2;
@@ -809,7 +896,8 @@ function frame(ts) {
   clockEl.textContent = hhmm(m);
   const ds = fmtDate(d);
   if (ds !== lastDate) { dateEl.textContent = ds; lastDate = ds; }
-  const txt = playing ? T('cat') + T('playing')[playKind] + T('left')(playLeft())
+  const ptxt = playing ? T('playing')[playKind] : '';
+  const txt = playing ? T('cat') + (typeof ptxt === 'function' ? ptxt(SEASON) : ptxt) + T('left')(playLeft())
     : (cat.walking ? T('walking') : T('cat') + st.txt);
   if (txt !== lastTxt) { statusEl.textContent = txt; lastTxt = txt; }
   if (st.k !== lastK) { document.querySelectorAll('#sched li').forEach(li => li.classList.toggle('now', li.dataset.k === st.k)); lastK = st.k; }
