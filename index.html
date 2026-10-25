@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font-size:14px;font-family:system-ui,sans-serif}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+</style>
+<title>猫猫小屋</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<style>
+/* Layout: one centred column — a wooden frame around the pixel scene, parchment panels below (single warm-wood look, both host themes) */
+:root{
+  --bg:#33261b; --wood:#6b4a32; --wood-dark:#4a3222; --wood-light:#8a6142;
+  --paper:#f3e3c3; --paper-hi:#fbefd6; --ink:#4a3322; --muted:#8a6d52; --accent:#d9773a;
+  --pix:"DotGothic16","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  color-scheme:dark;
+}
+html,body{background:var(--bg)}
+body{color:var(--paper);font-family:var(--pix);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+main{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:8px 16px;flex-wrap:wrap}
+h1{font-size:28px;margin:0;font-weight:400;letter-spacing:.06em;text-wrap:balance}
+.sub{font-size:15px;color:#cdb38e;margin-left:10px;letter-spacing:.08em}
+.right{display:flex;align-items:center;gap:14px}
+.lang{display:flex;border:2px solid var(--wood-dark);box-shadow:0 2px 0 #22170f}
+.lang button{box-shadow:none;border:0;padding:4px 10px;font-size:14px;background:var(--wood);color:#e8d3b0}
+.lang button[aria-pressed="true"]{background:var(--accent);color:#fff8ec}
+.lang button:active{transform:none}
+.when{display:flex;align-items:baseline;gap:10px}
+.date{font-size:16px;color:#cdb38e;letter-spacing:.04em}
+.clock{font-size:22px;font-variant-numeric:tabular-nums;color:var(--accent)}
+.scene{background:var(--wood);border:4px solid var(--wood-dark);box-shadow:inset 0 0 0 2px var(--wood-light),0 4px 0 #22170f;padding:6px;border-radius:4px}
+canvas{display:block;width:100%;max-width:100%;height:auto;aspect-ratio:220/172;image-rendering:pixelated;image-rendering:crisp-edges;background:#7cc4ee}
+.panel{background:var(--paper);color:var(--ink);border:3px solid var(--wood-dark);box-shadow:0 3px 0 #22170f;padding:12px 14px;border-radius:3px}
+.status{font-size:18px;display:flex;gap:10px;align-items:center;min-height:1.6em}
+.status .dot{width:10px;height:10px;background:var(--accent);flex:none}
+.controls{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+.controls label{font-size:15px;color:var(--muted)}
+input[type=range]{flex:1 1 180px;min-width:0;accent-color:var(--accent)}
+.ptime{font-variant-numeric:tabular-nums;min-width:4.5ch;font-size:16px}
+button{font-family:var(--pix);font-size:15px;background:var(--accent);color:#fff8ec;border:2px solid var(--wood-dark);padding:6px 12px;cursor:pointer;box-shadow:0 2px 0 var(--wood-dark)}
+button:active{transform:translateY(2px);box-shadow:none}
+button:focus-visible,input:focus-visible{outline:3px solid #ffd27a;outline-offset:2px}
+summary{font-size:15px;color:var(--muted);letter-spacing:.08em;cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"";width:0;height:0;border-left:6px solid var(--muted);border-top:5px solid transparent;border-bottom:5px solid transparent;transition:transform .15s}
+details[open] summary::before{transform:rotate(90deg)}
+details[open] summary{margin-bottom:8px}
+summary:focus-visible{outline:3px solid #ffd27a;outline-offset:2px}
+.sched{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px}
+.sched li{display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border:2px solid transparent;font-size:15px}
+.sched li.now{border-color:var(--accent);background:var(--paper-hi)}
+.sched .t{font-variant-numeric:tabular-nums;color:var(--muted)}
+</style>
+
+</head>
+<body>
+<main>
+  <header>
+    <h1><span data-i="title">猫猫小屋</span><span class="sub" data-i="sub" hidden>初夏 · 晴</span></h1>
+    <div class="right">
+      <div class="lang" role="group" aria-label="Language">
+        <button type="button" id="lang-zh" data-lang="zh" aria-pressed="true">中文</button>
+        <button type="button" id="lang-en" data-lang="en" aria-pressed="false">EN</button>
+      </div>
+      <div class="when"><span class="date" id="date"></span><span class="clock" id="clock">--:--</span></div>
+    </div>
+  </header>
+
+  <div class="scene"><canvas id="c"></canvas></div>
+
+  <div class="panel status" aria-live="polite"><span class="dot"></span><span id="status">…</span></div>
+
+  <details class="panel" id="routine">
+    <summary data-i="routine">猫猫的作息</summary>
+    <ul class="sched" id="sched">
+      <li data-k="eat540"><span data-i="breakfast">早饭</span><span class="t" data-about="09:00">09:00</span></li>
+      <li data-k="eat720"><span data-i="lunch">午饭</span><span class="t" data-about="12:00">12:00</span></li>
+      <li data-k="eat1080"><span data-i="dinner">晚饭</span><span class="t" data-about="18:00">18:00</span></li>
+      <li data-k="sleep"><span data-i="bed">睡觉</span><span class="t">22:30</span></li>
+      <li data-k="groom"><span data-i="groom">舔毛</span><span class="t" data-i="random">随机</span></li>
+      <li data-k="toilet"><span data-i="toilet">上厕所</span><span class="t" data-i="toiletWhen">每天 4 次</span></li>
+    </ul>
+  </details>
+
+  <div class="panel controls">
+    <label for="slider" data-i="preview">时间预览</label>
+    <input type="range" id="slider" min="0" max="1435" step="5" value="720">
+    <span class="ptime" id="ptime">现在</span>
+    <button type="button" id="now" data-i="back">回到现在</button>
+  </div>
+</main>
+
+<script>
+(() => {
+const W = 220, H = 172, HX = 26, HY = 48;
+const cv = document.getElementById('c');
+cv.width = W; cv.height = H;
+const g = cv.getContext('2d');
+g.imageSmoothingEnabled = false;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- colour helpers ----------
+const C = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; };
+const lerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+const S = a => `rgb(${a.map(Math.round).join(',')})`;
+const NIGHT = C('#1c2250');
+let NK = 0, dl = 1, night = 0, skyTop = C('#7cc4ee'), skyBot = C('#c8ecfa');
+const sh = h => S(lerp(C(h), NIGHT, NK));                 // outdoor colours dim at night
+const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+const O = (x, y, w, h, c) => R(x, y, w, h, sh(c));        // outdoors
+const L = (x, y, w, h, c) => R(HX + x, HY + y, w, h, c);  // inside the house
+const LO = (x, y, w, h, c) => R(HX + x, HY + y, w, h, sh(c)); // house exterior (roof)
+
+const kfc = fr => fr.map(([m, v]) => [m, typeof v === 'string' ? C(v) : v]);
+function kf(fr, m) {
+  for (let i = 0; i < fr.length - 1; i++) {
+    const [a, x] = fr[i], [b, y] = fr[i + 1];
+    if (m >= a && m <= b) { const t = (m - a) / (b - a || 1); return typeof x === 'number' ? x + (y - x) * t : lerp(x, y, t); }
+  }
+  return fr[fr.length - 1][1];
+}
+// early-summer day: dawn ~5:00, sunset ~21:30
+const SKYT = kfc([[0,'#0e1233'],[290,'#0e1233'],[330,'#4a3f7a'],[370,'#f0a07a'],[420,'#7cc4ee'],[1190,'#7cc4ee'],[1250,'#e88a5c'],[1295,'#3d2f66'],[1340,'#0e1233'],[1440,'#0e1233']]);
+const SKYB = kfc([[0,'#1d2552'],[290,'#1d2552'],[330,'#e59a7a'],[370,'#ffd59a'],[420,'#c8ecfa'],[1190,'#c8ecfa'],[1250,'#ffc27a'],[1295,'#a0607a'],[1340,'#1d2552'],[1440,'#1d2552']]);
+const DLF = [[0,0],[290,0],[420,1],[1190,1],[1320,0],[1440,0]];
+
+// ---------- deterministic randomness per day ----------
+function rng(seed) { let a = seed >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const STARS = Array.from({ length: 22 }, (_, i) => { const r = rng(i * 97 + 5); return [Math.floor(r() * W), Math.floor(r() * 70), r() * 6]; });
+const FLOWERS = Array.from({ length: 34 }, (_, i) => { const r = rng(i * 31 + 11); return [Math.floor(r() * W), 147 + Math.floor(r() * 23), ['#f28fb0','#ffe066','#ffffff','#c9a0f0'][Math.floor(r() * 4)]]; });
+const TUFTS = Array.from({ length: 40 }, (_, i) => { const r = rng(i * 53 + 7); return [Math.floor(r() * W), 146 + Math.floor(r() * 25)]; });
+
+// ---------- outdoors ----------
+function drawSky(m, t) {
+  for (let y = 0; y < 144; y += 4) R(0, y, W, 4, S(lerp(skyTop, skyBot, Math.min(1, y / 136))));
+  if (night > 0.25) {
+    for (const [x, y, p] of STARS) { g.globalAlpha = Math.min(1, night * 1.2) * (0.55 + 0.45 * Math.sin(t * 1.6 + p)); R(x, y, 1, 1, '#fff6d0'); }
+    g.globalAlpha = 1;
+  }
+  if (m > 320 && m < 1300) { // sun
+    const p = (m - 320) / 980, x = 6 + p * 206, y = 62 - Math.sin(Math.PI * p) * 54;
+    g.globalAlpha = 0.25; R(x - 5, y - 4, 10, 8, '#fff2b0'); R(x - 4, y - 5, 8, 10, '#fff2b0'); g.globalAlpha = 1;
+    R(x - 3, y - 2, 6, 4, '#ffe27a'); R(x - 2, y - 3, 4, 6, '#ffe27a'); R(x - 1, y - 2, 2, 1, '#fff6c8');
+  }
+  if (night > 0.35) { // crescent moon
+    g.globalAlpha = Math.min(1, (night - 0.35) * 2.5);
+    R(198, 9, 6, 8, '#f4eccd'); R(197, 10, 8, 6, '#f4eccd');
+    R(200, 8, 6, 8, S(skyTop)); R(201, 9, 6, 6, S(skyTop));
+    g.globalAlpha = 1;
+  }
+  const cc = S(lerp(lerp(C('#ffffff'), C('#ffd2b8'), Math.max(0, 1 - dl) * 0.8), C('#2e3360'), night * 0.85));
+  [[10, 12, 0.9], [90, 24, 0.6], [160, 6, 0.75]].forEach(([bx, y, sp]) => {
+    const x = ((bx + t * sp * (reduced ? 0.15 : 1)) % (W + 50)) - 30;
+    R(x, y + 2, 22, 4, cc); R(x + 3, y, 10, 3, cc); R(x + 11, y - 1, 7, 3, cc); R(x + 2, y + 5, 16, 1, cc);
+  });
+}
+
+function drawLand(m, t) {
+  for (let x = 0; x < W; x += 2) { const h = Math.round(126 + 5 * Math.sin(x / 23) + 3 * Math.sin(x / 9 + 1)); O(x, h, 2, 144 - h, '#86b86d'); }
+  for (let x = 0; x < W; x += 2) { const h = Math.round(134 + 3 * Math.sin(x / 15 + 2)); O(x, h, 2, 144 - h, '#73a95b'); }
+  O(0, 144, W, 28, '#6aa84f'); O(0, 144, W, 1, '#8fc46e');
+  for (const [x, y] of TUFTS) { O(x, y, 1, 2, '#4f8a3b'); O(x + 2, y + 1, 1, 1, '#4f8a3b'); }
+  for (const [x, y, c] of FLOWERS) { O(x, y, 1, 1, c); O(x, y + 1, 1, 1, '#4f8a3b'); }
+  // door step + a dirt path winding from the front door down the lawn
+  for (let y = 144; y < H; y++) {
+    const k = y - 144, w = 8 + Math.floor(k / 9), cx = 33 + Math.round(k * 0.6 + 2 * Math.sin(k / 5));
+    O(cx - (w >> 1), y, w, 1, '#c9a878');
+    O(cx - (w >> 1), y, 1, 1, '#a88a5e'); O(cx - (w >> 1) + w - 1, y, 1, 1, '#a88a5e');
+  }
+  [[31, 151], [37, 158], [43, 165], [36, 168]].forEach(([x, y]) => O(x, y, 2, 1, '#b39468'));
+  O(HX - 1, 144, 17, 2, '#b9b0a0'); O(HX - 1, 144, 17, 1, '#d3cbbb');
+  tree(12, 146); tree(208, 146);
+  if (dl > 0.6) { // butterfly
+    const bx = 70 + 46 * Math.sin(t * 0.27), by = 153 + 5 * Math.sin(t * 1.3), up = Math.floor(t * 8) % 2;
+    R(bx, by, 1, 2, '#5a4030');
+    if (up) { R(bx - 2, by - 1, 2, 2, '#fff1a0'); R(bx + 1, by - 1, 2, 2, '#fff1a0'); }
+    else { R(bx - 2, by + 1, 2, 1, '#fff1a0'); R(bx + 1, by + 1, 2, 1, '#fff1a0'); }
+  }
+  if (night > 0.5) { // fireflies
+    for (let i = 0; i < 7; i++) {
+      const r = rng(i * 17 + 3), x = r() * W, y = 132 + r() * 34, ph = r() * 6;
+      g.globalAlpha = night * Math.max(0, Math.sin(t * 1.4 + ph));
+      R(x + 3 * Math.sin(t * 0.5 + ph), y + 2 * Math.cos(t * 0.6 + ph), 1, 1, '#eaff8a');
+    }
+    g.globalAlpha = 1;
+  }
+}
+
+function tree(cx, b) {
+  O(cx - 2, b - 18, 4, 18, '#7a5234'); O(cx - 1, b - 18, 1, 18, '#93673f');
+  O(cx - 9, b - 34, 18, 14, '#3f8a44'); O(cx - 7, b - 38, 14, 4, '#3f8a44'); O(cx - 11, b - 30, 22, 8, '#3f8a44');
+  O(cx - 10, b - 23, 20, 3, '#2f6e38');
+  O(cx - 6, b - 36, 6, 3, '#5aa858'); O(cx - 9, b - 30, 4, 3, '#5aa858'); O(cx + 3, b - 32, 3, 2, '#5aa858');
+  O(cx - 3, b - 27, 1, 1, '#e8584a'); O(cx + 5, b - 25, 1, 1, '#e8584a'); // tiny cherries: early summer
+}
+
+// ---------- house ----------
+function drawRoof(t) {
+  for (let r = 0; r < 27; r++) {
+    const ins = r * 3, x = -6 + ins, w = 180 - 2 * ins, y = -1 - r;
+    LO(x, y, w, 1, r % 4 === 0 ? '#8e3b2e' : '#b5523e');
+    LO(x, y, 1, 1, '#6e2c22'); LO(x + w - 1, y, 1, 1, '#6e2c22');
+  }
+  LO(128, -27, 9, 16, '#8c6a5a'); LO(127, -28, 11, 2, '#6f5246');
+  for (let i = 0; i < 3; i++) LO(129 + (i % 2) * 3, -24 + i * 4, 4, 1, '#735548');
+  if (dl > 0.4 && !reduced) for (let i = 0; i < 3; i++) { // chimney smoke
+    const p = (t * 0.25 + i / 3) % 1; g.globalAlpha = (1 - p) * 0.55 * dl;
+    R(HX + 131 + Math.sin(p * 6 + i) * 3 + p * 6, HY - 31 - p * 16, 3, 3, '#eeeeee');
+  }
+  g.globalAlpha = 1;
+  LO(-6, -1, 180, 2, '#5a3a26');
+}
+
+function win(x, y, w, h, opt = {}) {
+  L(x - 1, y - 1, w + 2, h + 2, '#7a5236');
+  for (let yy = 0; yy < h; yy++) L(x, y + yy, w, 1, S(lerp(skyTop, skyBot, Math.min(1, (HY + y + yy) / 136))));
+  if (!opt.frost) { L(x, y + h - 3, w, 3, sh('#86b86d')); if (dl > 0.5) L(x + 2, y + h - 5, 3, 2, sh('#3f8a44')); }
+  if (night > 0.55 && !opt.frost) L(x + 2, y + 2, 1, 1, '#fff6d0');
+  if (opt.frost) { g.globalAlpha = 0.55; L(x, y, w, h, '#eef7fa'); g.globalAlpha = 1; }
+  L(x + (w >> 1), y, 1, h, '#7a5236'); L(x, y + (h >> 1), w, 1, '#7a5236');
+  L(x - 2, y + h + 1, w + 4, 1, '#9a7050');
+  if (opt.curtain) { L(x - 3, y - 2, 2, h + 3, opt.curtain); L(x + w + 1, y - 2, 2, h + 3, opt.curtain); L(x - 4, y - 3, w + 8, 1, '#5a3a26'); }
+}
+
+function woodFloor(x, y, w) {
+  L(x, y, w, 4, '#b47c4a'); L(x, y, w, 1, '#c99260');
+  for (let i = x + 5; i < x + w; i += 12) L(i, y + 1, 1, 3, '#9a6538');
+  L(x, y - 1, w, 1, '#c9a878');
+}
+
+function bedroom(m, lightsOn) {
+  L(2, 2, 80, 40, '#ecd9a8');
+  for (let y = 6; y < 40; y += 8) for (let x = 6 + (y % 16 ? 4 : 0); x < 82; x += 8) L(x, y, 1, 1, '#dcc38d');
+  woodFloor(2, 42, 80);
+  win(47, 10, 16, 14, { curtain: '#e07f6a' });
+  L(67, 8, 10, 8, '#7a5236'); L(68, 9, 8, 6, '#bfe3f2'); L(68, 12, 8, 3, '#7fb069'); L(73, 10, 2, 2, '#ffe27a'); // little painting
+  L(46, 41, 30, 2, '#c97b84'); L(47, 41, 28, 1, '#d99aa1');                       // rug
+  // bed
+  L(6, 25, 3, 17, '#8a5a3a'); L(6, 25, 3, 1, '#a8744a');
+  L(9, 37, 25, 3, '#8a5a3a'); L(10, 40, 2, 2, '#6b4530'); L(31, 40, 2, 2, '#6b4530');
+  L(33, 31, 2, 9, '#8a5a3a');
+  L(9, 34, 24, 3, '#f4efe6'); L(10, 31, 6, 3, '#ffffff'); L(10, 33, 6, 1, '#e3ddd2');
+  L(16, 33, 17, 4, '#6f9fd8'); L(16, 33, 17, 1, '#8fb7e6'); L(16, 35, 17, 1, '#5a86c0');
+  // nightstand + lamp
+  L(36, 34, 7, 8, '#9b6b45'); L(36, 34, 7, 1, '#b07e55'); L(39, 37, 1, 1, '#e8d0a0');
+  L(38, 31, 3, 3, '#c9a878'); L(37, 27, 5, 4, lightsOn ? '#ffd27a' : '#e2b45e');
+  // plant
+  L(73, 36, 6, 6, '#c0673f'); L(73, 36, 6, 1, '#d98458'); L(72, 30, 8, 6, '#4f9a4a'); L(74, 27, 3, 3, '#4f9a4a'); L(73, 31, 2, 2, '#6dbb5f');
+}
+
+function study(m, lightsOn) {
+  L(85, 2, 81, 40, '#cfdcb8');
+  for (let x = 88; x < 166; x += 6) L(x, 2, 1, 40, '#c2d0aa');
+  woodFloor(85, 42, 81);
+  // bookshelf
+  L(88, 8, 16, 34, '#7a5236'); L(89, 9, 14, 31, '#5a3a26');
+  const BK = ['#c0504d','#4f81bd','#9bbb59','#f2c46d','#8064a2','#e07f6a','#4bacc6'];
+  [17, 27, 40].forEach((by, row) => {
+    if (row < 2) L(89, by + 1, 14, 1, '#7a5236');
+    for (let x = 90, i = 0; x < 102; x += 2, i++) { const h = 5 + ((i * 3 + row) % 3); L(x, by - h + 1, 2, h, BK[(i + row * 2) % BK.length]); }
+  });
+  win(112, 10, 16, 14, { curtain: '#d9a441' });
+  // clock showing the scene's time
+  L(152, 7, 11, 11, '#7a5236'); L(153, 8, 9, 9, '#f8f1de');
+  const cx = HX + 157, cy = HY + 12, ha = ((m / 60) % 12) / 12 * Math.PI * 2, ma = (m % 60) / 60 * Math.PI * 2;
+  for (let i = 1; i <= 3; i++) R(cx + Math.round(Math.sin(ma) * i), cy - Math.round(Math.cos(ma) * i), 1, 1, '#4a3322');
+  for (let i = 1; i <= 2; i++) R(cx + Math.round(Math.sin(ha) * i), cy - Math.round(Math.cos(ha) * i), 1, 1, '#c0504d');
+  R(cx, cy, 1, 1, '#4a3322');
+  // chair
+  L(122, 25, 2, 17, '#7a5236'); L(122, 33, 8, 2, '#a06a40'); L(128, 35, 1, 7, '#7a5236'); L(123, 35, 1, 7, '#7a5236');
+  // desk
+  L(128, 31, 35, 2, '#a06a40'); L(128, 31, 35, 1, '#b98252'); L(129, 33, 2, 9, '#7a5236'); L(160, 33, 2, 9, '#7a5236');
+  L(150, 33, 9, 5, '#8a5a36'); L(154, 35, 2, 1, '#e8d0a0');
+  L(147, 23, 11, 8, '#3a3a48'); L(148, 24, 9, 6, night > 0.5 ? '#bfe6ff' : '#9fd0e8'); L(149, 25, 4, 1, '#ffffff');
+  L(145, 30, 14, 1, '#c0c0c8');
+  L(142, 28, 3, 3, '#e8e0d0'); L(145, 29, 1, 1, '#e8e0d0');
+  L(161, 24, 1, 7, '#4a4a4a'); L(158, 22, 4, 2, lightsOn ? '#ffd27a' : '#e2b45e');
+  // plant
+  L(106, 37, 5, 5, '#c0673f'); L(105, 32, 7, 5, '#4f9a4a'); L(107, 30, 2, 2, '#6dbb5f');
+}
+
+function kitchen(m, lightsOn, eating) {
+  L(2, 50, 112, 40, '#f1dfb6');
+  for (let x = 2; x < 114; x += 4) L(x, 90, Math.min(4, 114 - x), 4, ((x >> 2) % 2) ? '#d9c7a4' : '#bba582');
+  L(2, 89, 112, 1, '#c9a878');
+  // front door: flush with the house's left edge, running down through the floor line to the step
+  L(0, 63, 15, 33, '#5a3a26'); L(1, 64, 13, 32, '#7a5236');
+  L(2, 65, 11, 31, '#a8744a'); L(2, 65, 11, 1, '#b98252'); L(2, 65, 1, 31, '#b98252');
+  L(4, 67, 7, 6, '#7a5236'); L(5, 68, 5, 4, S(lerp(skyTop, skyBot, 0.6))); L(5, 68, 2, 1, '#ffffff');
+  L(4, 76, 3, 7, '#93623c'); L(8, 76, 3, 7, '#93623c'); L(4, 85, 3, 8, '#93623c'); L(8, 85, 3, 8, '#93623c');
+  L(11, 80, 1, 2, '#f2c46d');
+  // fridge
+  L(46, 60, 11, 30, '#e9eef0'); L(46, 60, 11, 1, '#c5ccd0'); L(46, 70, 11, 1, '#c5ccd0');
+  L(55, 63, 1, 4, '#9aa3a8'); L(55, 73, 1, 6, '#9aa3a8'); L(48, 64, 2, 2, '#e07f6a'); L(51, 75, 2, 2, '#6f9fd8');
+  // little shelf beside the window
+  L(39, 60, 6, 1, '#8a5a36'); L(40, 57, 2, 3, '#e8e0d0'); L(43, 58, 1, 2, '#c0504d');
+  // backsplash
+  L(16, 69, 28, 8, '#fdfaf2'); for (let x = 16; x < 44; x += 4) L(x, 69, 1, 8, '#d6e4e8'); L(16, 73, 28, 1, '#d6e4e8');
+  // counter + sink + pot
+  L(15, 77, 30, 2, '#d9c3a0'); L(16, 79, 28, 11, '#9b6b45'); L(29, 79, 1, 11, '#7a5236'); L(26, 83, 1, 2, '#e8d0a0'); L(32, 83, 1, 2, '#e8d0a0');
+  L(18, 77, 9, 1, '#b8c4c8'); L(21, 72, 1, 5, '#9aa3a8'); L(21, 72, 3, 1, '#9aa3a8');
+  L(33, 72, 8, 5, '#5a6a78'); L(33, 72, 8, 1, '#7a8a98'); L(41, 73, 2, 1, '#3a2a1a');
+  const cooking = todayMeals.some(ml => m >= ml.start - 30 && m < ml.start + ml.dur);
+  if (cooking && !reduced) for (let i = 0; i < 3; i++) { const p = (performance.now() / 2600 + i / 3) % 1; g.globalAlpha = (1 - p) * 0.6; L(35 + i * 2 + Math.sin(p * 7) * 1.5, 70 - p * 10, 2, 2, '#ffffff'); }
+  g.globalAlpha = 1;
+  win(23, 55, 14, 11, { curtain: '#9bbb59' });
+  // hanging lamp
+  L(93, 50, 1, 6, '#3a2a1a'); L(89, 56, 9, 3, '#e9b44c'); L(92, 59, 3, 1, lightsOn ? '#fff2c0' : '#d8c890');
+  // table + chairs + fruit
+  L(72, 70, 2, 20, '#8a5a36'); L(72, 80, 6, 2, '#a06a40'); L(76, 82, 1, 8, '#8a5a36');
+  L(111, 70, 2, 20, '#8a5a36'); L(107, 80, 6, 2, '#a06a40'); L(108, 82, 1, 8, '#8a5a36');
+  L(78, 76, 30, 2, '#a06a40'); L(78, 76, 30, 1, '#b98252'); L(80, 78, 26, 1, '#8a5a36'); L(80, 79, 2, 11, '#8a5a36'); L(104, 79, 2, 11, '#8a5a36');
+  L(90, 73, 7, 3, '#e8e0d0'); L(91, 71, 2, 2, '#e0533a'); L(94, 71, 2, 2, '#f2b33a'); L(93, 70, 1, 1, '#4f9a4a');
+  // cat bowls, in the open floor between the fridge and the table
+  L(58, 88, 6, 2, '#d9534f'); L(58, 88, 6, 1, '#e8736f'); if (eating) L(59, 87, 4, 1, '#8a5a36');
+  L(65, 88, 5, 2, '#6f9fd8'); L(66, 87, 3, 1, '#bfe6ff');
+}
+
+function bathroom() {
+  L(117, 50, 49, 40, '#cfe4e8');
+  for (let x = 117; x < 166; x += 4) L(x, 72, 1, 18, '#b8d2d8'); for (let y = 72; y < 90; y += 4) L(117, y, 49, 1, '#b8d2d8');
+  for (let x = 117; x < 166; x += 4) L(x, 90, Math.min(4, 166 - x), 4, ((x >> 2) % 2) ? '#9fbfc8' : '#88aab5');
+  win(149, 55, 10, 11, { frost: true });
+  // toilet
+  L(119, 69, 5, 13, '#f6f6f6'); L(119, 69, 5, 1, '#e3e8ea'); L(120, 82, 10, 3, '#ffffff'); L(120, 82, 10, 1, '#e3e8ea'); L(123, 85, 5, 5, '#eef2f4');
+  // mirror + sink
+  L(133, 56, 10, 12, '#b0a090'); L(134, 57, 8, 10, '#dff2f6'); L(135, 58, 2, 4, '#ffffff');
+  L(132, 75, 12, 3, '#ffffff'); L(132, 75, 12, 1, '#f0f6f8'); L(137, 78, 3, 12, '#eef2f4'); L(138, 72, 1, 3, '#9aa3a8');
+  // towel
+  L(160, 69, 6, 1, '#9aa3a8'); L(161, 70, 4, 7, '#e07f6a'); L(161, 74, 4, 1, '#f2a08c');
+  // tub + duck
+  L(147, 79, 19, 2, '#f4f4f4'); L(148, 81, 17, 7, '#ffffff'); L(148, 86, 17, 2, '#e3e8ea');
+  L(150, 88, 2, 2, '#c9a878'); L(161, 88, 2, 2, '#c9a878');
+  L(163, 75, 1, 4, '#9aa3a8'); L(161, 75, 3, 1, '#9aa3a8');
+  L(152, 77, 4, 2, '#f7d23a'); L(155, 76, 2, 2, '#f7d23a'); L(157, 77, 1, 1, '#e8873a');
+}
+
+// ---------- the cat ----------
+const CB = '#e8963f', CD = '#c06f2c', CL = '#f8dcae', CE = '#2a1d14', CN = '#e57d7d', COL = '#4a2e1c';
+const spriteCache = {};
+function sprite(pose, f) {
+  const key = pose + f;
+  if (spriteCache[key]) return spriteCache[key];
+  const c = document.createElement('canvas'); c.width = 14; c.height = 13;
+  const x = c.getContext('2d');
+  const p = (dx, dy, w, h, col) => { x.fillStyle = col; x.fillRect(dx + 1, dy + 1, w, h); };
+  const tailUp = () => { p(0, 2, 1, 4, CB); p(1, 5, 1, 1, CB); p(0, 1, 1, 1, CD); };
+  const sit = () => {
+    p(0, 9, 4, 1, CB); p(0, 8, 1, 1, CB); p(0, 7, 1, 1, CD);
+    p(3, 5, 6, 6, CB); p(4, 4, 4, 1, CB); p(7, 5, 2, 5, CL); p(7, 10, 3, 1, CL);
+    p(4, 6, 1, 1, CD); p(4, 8, 1, 1, CD); p(6, 5, 1, 1, CD);
+  };
+  const head = (hx, hy, eye = 'open') => {
+    p(hx, hy, 5, 4, CB); p(hx, hy - 1, 1, 1, CB); p(hx + 4, hy - 1, 1, 1, CB); p(hx + 1, hy, 1, 1, CD);
+    p(hx + 3, hy + 2, 2, 1, CL);
+    if (eye === 'open') p(hx + 3, hy + 1, 1, 1, CE); else p(hx + 2, hy + 2, 2, 1, CE);
+    p(hx + 4, hy + 2, 1, 1, CN);
+  };
+  const standBody = () => { p(1, 5, 8, 4, CB); p(2, 4, 6, 1, CB); p(3, 8, 5, 1, CL); p(3, 5, 1, 2, CD); p(5, 5, 1, 2, CD); p(7, 5, 1, 1, CD); };
+  if (pose === 'sit') { sit(); head(7, 1); }
+  else if (pose === 'walk') {
+    tailUp(); standBody();
+    const legs = f ? [3, 6] : [2, 7];
+    legs.forEach(l => { p(l, 9, 1, 1, CB); p(l, 10, 1, 1, CL); });
+    head(7, 2);
+  } else if (pose === 'eat') {
+    tailUp(); standBody(); [2, 7].forEach(l => { p(l, 9, 1, 1, CB); p(l, 10, 1, 1, CL); });
+    head(7, 5 + f);
+  } else if (pose === 'groom') {
+    sit();
+    if (f) { head(7, 2, 'closed'); p(9, 6, 2, 1, CL); } else { head(7, 1, 'closed'); p(9, 4, 2, 2, CL); }
+  } else { // sleep: curled loaf
+    p(1, 6, 10, 5, CB); p(2, 5, 8, 1, CB); if (f) p(3, 4, 5, 1, CB);
+    p(3, 6, 1, 2, CD); p(5, 6, 1, 2, CD); p(1, 10, 9, 1, CD);
+    p(7, 6, 5, 4, CB); p(7, 5, 1, 1, CB); p(11, 5, 1, 1, CB); p(9, 8, 2, 1, CE); p(11, 8, 1, 1, CN);
+  }
+  // 1px outline around opaque pixels
+  const img = x.getImageData(0, 0, 14, 13), d = img.data, oc = C(COL), solid = i => d[i * 4 + 3] > 0;
+  const mark = [];
+  for (let y = 0; y < 13; y++) for (let xx = 0; xx < 14; xx++) {
+    const i = y * 14 + xx; if (solid(i)) continue;
+    if ((xx > 0 && solid(i - 1)) || (xx < 13 && solid(i + 1)) || (y > 0 && solid(i - 14)) || (y < 12 && solid(i + 14))) mark.push(i);
+  }
+  for (const i of mark) { d[i * 4] = oc[0]; d[i * 4 + 1] = oc[1]; d[i * 4 + 2] = oc[2]; d[i * 4 + 3] = 255; }
+  x.putImageData(img, 0, 0);
+  return spriteCache[key] = c;
+}
+function drawCat(lx, ly, dir, pose, f, alpha) {
+  const sx = HX + Math.round(lx) - 1, sy = HY + ly - 12, s = sprite(pose, f);
+  g.globalAlpha = alpha;
+  if (dir < 0) { g.save(); g.translate(sx + 14, sy); g.scale(-1, 1); g.drawImage(s, 0, 0); g.restore(); }
+  else g.drawImage(s, sx, sy);
+  g.globalAlpha = 1;
+  return [sx, sy];
+}
+
+// ---------- the cat's day ----------
+// ---------- language ----------
+const I18N = {
+  zh: { title: '猫猫小屋', sub: '初夏 · 晴', routine: '猫猫的作息', breakfast: '早饭', lunch: '午饭', dinner: '晚饭',
+        bed: '睡觉', groom: '舔毛', random: '随机', about: '约 ', preview: '时间预览', back: '回到现在', now: '现在',
+        cat: '猫猫', walking: '猫猫正在走过去…', sleep: '在床上睡觉，晚安', eat: n => `在吃${n}`, wait: n => `蹲在碗边等${n}`,
+        grooming: '在舔毛，认真打理自己', toilet: '上厕所', toiletWhen: '每天 4 次',
+        pee: '在马桶上小便', poo: '在马桶上大便，请勿打扰', flush: '冲完马桶了，很讲卫生',
+        aria: '像素风小房子：卧室、书房、厨房餐厅和卫生间，一只橘猫在屋里活动' },
+  en: { title: 'Cat Cottage', sub: 'Early summer · Sunny', routine: "The cat's day", breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
+        bed: 'Bedtime', groom: 'Grooming', random: 'Random', about: '~', preview: 'Preview time', back: 'Back to now', now: 'Now',
+        cat: 'The cat ', walking: 'The cat is on its way…', sleep: 'is asleep in bed. Good night', eat: n => `is having ${n.toLowerCase()}`,
+        wait: n => `is waiting by the bowl for ${n.toLowerCase()}`, grooming: 'is grooming, very thoroughly',
+        toilet: 'Toilet', toiletWhen: '4 times a day', pee: 'is having a wee on the toilet',
+        poo: 'is doing a number two. Privacy, please', flush: 'has flushed. Very tidy',
+        aria: 'Pixel-art cottage with a bedroom, study, kitchen-diner and bathroom, where a ginger cat goes about its day' },
+};
+let LANG = 'zh';
+try { const s = localStorage.getItem('cat-lang'); if (s === 'en' || s === 'zh') LANG = s; } catch (e) {}
+const T = k => I18N[LANG][k];
+
+const MEALS = [[540, 'breakfast'], [720, 'lunch'], [1080, 'dinner']];
+const SLEEP = 1350, WAKE = 450;
+const BOWL = { x: 59, y: 90, dir: -1 }, BED = { x: 17, y: 33, dir: 1 }, LOO = { x: 119, y: 83, dir: 1 };
+const IDLE = [
+  { x: 52, y: 42, dir: -1, txt: { zh: '在卧室地毯上发呆', en: 'is daydreaming on the bedroom rug' } },
+  { x: 20, y: 33, dir: -1, txt: { zh: '在床上打盹', en: 'is napping on the bed' }, lie: true },
+  { x: 113, y: 42, dir: 1, txt: { zh: '在书房窗边晒太阳', en: 'is sunbathing by the study window' },
+    txtN: { zh: '在书房窗边看月亮', en: 'is watching the moon from the study window' } },
+  { x: 129, y: 31, dir: 1, txt: { zh: '霸占了书桌', en: 'has taken over the desk' } },
+  { x: 86, y: 90, dir: 1, txt: { zh: '躲在餐桌底下', en: 'is hiding under the dining table' } },
+  { x: 131, y: 90, dir: 1, txt: { zh: '在卫生间巡逻', en: 'is patrolling the bathroom' } },
+  { x: 30, y: 90, dir: -1, txt: { zh: '在厨房里转悠', en: 'is pottering around the kitchen' } },
+];
+// each day: every meal starts up to 20 min early or late, and lasts 10–25 min
+const mealCache = {};
+function mealsFor(seed) {
+  if (mealCache[seed]) return mealCache[seed];
+  const r = rng(seed * 13 + 1);
+  return mealCache[seed] = MEALS.map(([base, name]) => ({
+    base, name, start: base + Math.round((r() * 2 - 1) * 20), dur: 10 + Math.round(r() * 15),
+  }));
+}
+// toilet: 3 wees (late morning, mid-afternoon, evening) + 1 poo (after lunch or after dinner),
+// each moved up to 40 min either way, never during a meal and at least 30 min apart
+const looCache = {};
+function toiletFor(seed) {
+  if (looCache[seed]) return looCache[seed];
+  const r = rng(seed * 29 + 5), meals = mealsFor(seed), out = [];
+  const plan = [[610, 'pee'], [900, 'pee'], [1260, 'pee'], [r() < 0.5 ? 800 : 1150, 'poo']];
+  for (const [base, kind] of plan) {
+    const dur = kind === 'poo' ? 6 : 3;
+    let s = base + Math.round((r() * 2 - 1) * 40);
+    for (let i = 0; i < 20; i++) {
+      const bad = meals.some(ml => s + dur + 5 > ml.start - 5 && s < ml.start + ml.dur + 5)
+        || out.some(o => s + dur > o.start - 30 && s < o.start + o.dur + 30);
+      if (!bad) break;
+      s += 15;
+    }
+    out.push({ start: s, dur, kind });
+  }
+  return looCache[seed] = out;
+}
+function groomTimes(seed) {
+  const r = rng(seed * 7 + 3), out = [], meals = mealsFor(seed), loo = toiletFor(seed);
+  for (let k = 0; k < 200 && out.length < 4; k++) {
+    const s = Math.floor(WAKE + 10 + r() * (SLEEP - WAKE - 30));
+    if (meals.some(ml => s + 8 > ml.start - 10 && s < ml.start + ml.dur + 10)) continue;
+    if (loo.some(t => s + 8 > t.start - 5 && s < t.start + t.dur + 8)) continue;
+    if (out.some(o => Math.abs(o - s) < 45)) continue;
+    out.push(s);
+  }
+  return out;
+}
+function catState(m, seed) {
+  if (m >= SLEEP || m < WAKE) return { pose: 'sleep', spot: BED, txt: T('sleep'), k: 'sleep' };
+  for (const ml of mealsFor(seed)) {
+    if (m >= ml.start && m < ml.start + ml.dur) return { pose: 'eat', spot: BOWL, txt: T('eat')(T(ml.name)), k: 'eat' + ml.base, food: true };
+    if (m >= ml.start - 5 && m < ml.start) return { pose: 'sit', spot: BOWL, txt: T('wait')(T(ml.name)), k: 'eat' + ml.base };
+  }
+  for (const t of toiletFor(seed)) {
+    if (m >= t.start && m < t.start + t.dur) return { pose: 'sit', spot: LOO, txt: T(t.kind), k: 'toilet' };
+    if (m >= t.start + t.dur && m < t.start + t.dur + 1) return { pose: 'sit', spot: LOO, txt: T('flush'), k: 'toilet', flush: true };
+  }
+  const n = IDLE.length, block = Math.floor((m - WAKE) / 35);
+  const pick = b => Math.floor(rng(seed * 131 + b)() * n);
+  let idx = pick(block); if (idx === pick(block - 1)) idx = (idx + 1) % n;
+  const spot = IDLE[idx];
+  if (groomTimes(seed).some(s => m >= s && m < s + 8)) return { pose: 'groom', spot, txt: T('grooming'), k: 'groom' };
+  return { pose: spot.lie ? 'sleep' : 'sit', spot, txt: ((dl < 0.3 && spot.txtN) || spot.txt)[LANG], k: 'idle' };
+}
+
+let todayMeals = [];
+const cat = { x: BED.x, y: BED.y, dir: 1, alpha: 1, phase: null, walking: false };
+function moveCat(tg, dt, instant) {
+  if (instant) { Object.assign(cat, { x: tg.x, y: tg.y, dir: tg.dir, alpha: 1, phase: null, walking: false }); return; }
+  if (cat.phase === 'out') { cat.alpha -= dt * 3; if (cat.alpha <= 0) Object.assign(cat, { x: tg.x, y: tg.y, dir: tg.dir, phase: 'in', alpha: 0 }); return; }
+  if (cat.phase === 'in') { cat.alpha += dt * 3; if (cat.alpha >= 1) { cat.alpha = 1; cat.phase = null; } return; }
+  if (cat.x === tg.x && cat.y === tg.y) { cat.walking = false; cat.dir = tg.dir; return; }
+  if (cat.y !== tg.y || reduced) { cat.phase = 'out'; cat.walking = false; return; }
+  const d = tg.x - cat.x, step = 14 * dt; cat.dir = Math.sign(d);
+  cat.x = Math.abs(d) <= step ? tg.x : cat.x + step * cat.dir; cat.walking = true;
+}
+
+// ---------- UI + loop ----------
+const $ = id => document.getElementById(id);
+const slider = $('slider'), ptime = $('ptime'), statusEl = $('status'), clockEl = $('clock');
+const hhmm = m => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.floor(m % 60)).padStart(2, '0')}`;
+const dateEl = $('date');
+let lastDate = '';
+// 中文：10月25日 周日；English (UK): Sun 25 Oct — month spelled out so it never reads as a number order
+const EN_DAY = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], EN_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtDate = d => LANG === 'zh'
+  ? `${d.getMonth() + 1}月${d.getDate()}日 周${'日一二三四五六'[d.getDay()]}`
+  : `${EN_DAY[d.getDay()]} ${d.getDate()} ${EN_MON[d.getMonth()]}`;
+let preview = null, jump = true, last = performance.now(), lastTxt = '', lastK = '';
+const nowMinutes = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60; };
+slider.value = Math.floor(nowMinutes() / 5) * 5;
+slider.addEventListener('input', () => { preview = +slider.value; ptime.textContent = hhmm(preview); jump = true; });
+$('now').addEventListener('click', () => { preview = null; ptime.textContent = T('now'); slider.value = Math.floor(nowMinutes() / 5) * 5; jump = true; });
+
+function applyLang() {
+  document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en';
+  document.querySelectorAll('[data-i]').forEach(el => { el.textContent = T(el.dataset.i); });
+  document.querySelectorAll('[data-about]').forEach(el => { el.textContent = T('about') + el.dataset.about; });
+  cv.setAttribute('aria-label', T('aria'));
+  if (preview === null) ptime.textContent = T('now');
+  document.querySelectorAll('.lang button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === LANG)));
+  lastTxt = ''; lastDate = '';
+}
+document.querySelectorAll('.lang button').forEach(b => b.addEventListener('click', () => {
+  LANG = b.dataset.lang;
+  try { localStorage.setItem('cat-lang', LANG); } catch (e) {}
+  applyLang();
+}));
+applyLang();
+
+function frame(ts) {
+  const dt = Math.min(0.1, (ts - last) / 1000); last = ts;
+  const t = ts / 1000, m = preview ?? nowMinutes();
+  const d = new Date(), seed = d.getFullYear() * 400 + d.getMonth() * 32 + d.getDate();
+  dl = kf(DLF, m); night = 1 - dl; NK = night * 0.62;
+  skyTop = kf(SKYT, m); skyBot = kf(SKYB, m);
+
+  todayMeals = mealsFor(seed);
+  const st = catState(m, seed);
+  moveCat(st.spot, dt, jump); jump = false;
+  const lightsOn = night > 0.15 && m >= 1020 && m < SLEEP;
+  const bedLamp = lightsOn;
+
+  drawSky(m, t); drawLand(m, t); drawRoof(t);
+  L(0, 0, 168, 96, '#5c3d29'); L(0, 0, 168, 1, '#7a5236');
+  bedroom(m, bedLamp); study(m, lightsOn); kitchen(m, lightsOn, !!st.food); bathroom();
+
+  const pose = cat.walking ? 'walk' : st.pose;
+  const rate = { walk: 5, eat: 3, groom: 2, sleep: 0.7, sit: 0 }[pose];
+  const f = rate ? Math.floor(t * rate) % 2 : 0;
+  const [csx, csy] = drawCat(cat.x, cat.y, cat.dir, pose, f, cat.alpha);
+
+  // night: dim each room, then lamp glow
+  if (night > 0.02) {
+    const rooms = [[2, 2, 80, 44, bedLamp], [85, 2, 81, 44, lightsOn], [2, 50, 112, 44, lightsOn], [117, 50, 49, 44, lightsOn]];
+    for (const [x, y, w, h, on] of rooms) { g.globalAlpha = night * (on ? 0.16 : 0.55); L(x, y, w, h, '#141a44'); }
+    g.globalAlpha = 1;
+    if (lightsOn) {
+      const glows = [[39, 29, bedLamp], [159, 24, true], [93, 62, true], [138, 54, true]];
+      for (const [x, y, on] of glows) if (on) for (let r = 3; r >= 1; r--) { g.globalAlpha = 0.07 * night; L(x - r * 5, y - r * 3, r * 10, r * 6, '#ffd27a'); }
+      g.globalAlpha = 1;
+    }
+  }
+  if (pose === 'sleep' && cat.alpha > 0.9) for (let i = 0; i < 3; i++) {
+    const p = (t * 0.35 + i / 3) % 1; g.globalAlpha = 1 - p;
+    const zx = csx + 11 + p * 6, zy = csy - 1 - p * 10;
+    R(zx, zy, 3, 1, '#f6f1ff'); R(zx + 1, zy + 1, 1, 1, '#f6f1ff'); R(zx, zy + 2, 3, 1, '#f6f1ff');
+  }
+  g.globalAlpha = 1;
+
+  clockEl.textContent = hhmm(m);
+  const ds = fmtDate(d);
+  if (ds !== lastDate) { dateEl.textContent = ds; lastDate = ds; }
+  const txt = cat.walking ? T('walking') : T('cat') + st.txt;
+  if (txt !== lastTxt) { statusEl.textContent = txt; lastTxt = txt; }
+  if (st.k !== lastK) { document.querySelectorAll('#sched li').forEach(li => li.classList.toggle('now', li.dataset.k === st.k)); lastK = st.k; }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+
+<script>
+// Inside Telegram: open full height and match the header colour to the wood frame
+try {
+  const tg = window.Telegram && Telegram.WebApp;
+  if (tg && tg.initData !== undefined) {
+    tg.ready(); tg.expand();
+    tg.setHeaderColor && tg.setHeaderColor('#33261b');
+    tg.setBackgroundColor && tg.setBackgroundColor('#33261b');
+  }
+} catch (e) {}
+</script>
+</body>
+</html>
