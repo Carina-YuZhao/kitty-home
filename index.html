@@ -283,6 +283,7 @@ function win(x, y, w, h, opt = {}) {
   for (let yy = 0; yy < h; yy++) L(x, y + yy, w, 1, S(lerp(skyTop, skyBot, Math.min(1, (HY + y + yy) / 136))));
   if (!opt.frost) { L(x, y + h - 3, w, 3, sh(P.hill1)); if (dl > 0.5 && P.leaf) L(x + 2, y + h - 5, 3, 2, sh(P.leaf)); }
   if (night > 0.55 && !opt.frost) L(x + 2, y + 2, 1, 1, '#fff6d0');
+  if (fwFlash) { g.globalAlpha = 0.45 * fwFlash[1]; L(x, y, w, h, fwFlash[0]); g.globalAlpha = 1; } // fireworks light up the glass
   if (opt.frost) { g.globalAlpha = 0.55; L(x, y, w, h, '#eef7fa'); g.globalAlpha = 1; }
   L(x + (w >> 1), y, 1, h, '#7a5236'); L(x, y + (h >> 1), w, 1, '#7a5236');
   L(x - 2, y + h + 1, w + 4, 1, '#9a7050');
@@ -475,7 +476,7 @@ const I18N = {
   zh: { title: '猫猫小屋', sub: '初夏 · 晴', routine: '猫猫的作息', breakfast: '早饭', lunch: '午饭', dinner: '晚饭',
         bed: '睡觉', groom: '舔毛', random: '随机', about: '约 ', preview: '时间预览', back: '回到现在', now: '现在',
         cat: '猫猫', walking: '猫猫正在走过去…', sleep: '在床上睡觉，晚安', eat: n => `在吃${n}`, wait: n => `蹲在碗边等${n}`,
-        playing: { yarn: '在追毛线球！', wand: '在扑逗猫棒上的羽毛！', box: '钻进了纸箱，只露出一个脑袋', bubble: '在拍泡泡' },
+        playing: { yarn: '在追毛线球！', wand: '在扑逗猫棒上的羽毛！', box: '钻进了纸箱，只露出一个脑袋', bubble: '在拍泡泡', fireworks: '坐在书房窗台上看烟花 🎆' },
         left: s => `（还剩 ${s} 秒）`,
         party: ['🎉 今天的任务全部完成！小屋挂上了彩旗', '🎉 今天的任务全部完成！餐桌上多了一束向日葵', '🎉 今天的任务全部完成！椅子上绑了一串气球'],
         grooming: '在舔毛，认真打理自己', toilet: '上厕所', toiletWhen: '每天 4 次',
@@ -484,7 +485,7 @@ const I18N = {
   en: { title: 'Cat Cottage', sub: 'Early summer · Sunny', routine: "The cat's day", breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
         bed: 'Bedtime', groom: 'Grooming', random: 'Random', about: '~', preview: 'Preview time', back: 'Back to now', now: 'Now',
         cat: 'The cat ', walking: 'The cat is on its way…', sleep: 'is asleep in bed. Good night', eat: n => `is having ${n.toLowerCase()}`,
-        playing: { yarn: 'is chasing a ball of yarn!', wand: 'is pouncing on the feather wand!', box: 'has squeezed into a box, only its head poking out', bubble: 'is batting at bubbles' },
+        playing: { yarn: 'is chasing a ball of yarn!', wand: 'is pouncing on the feather wand!', box: 'has squeezed into a box, only its head poking out', bubble: 'is batting at bubbles', fireworks: 'is on the study windowsill watching fireworks 🎆' },
         left: s => ` (${s}s left)`,
         party: ["🎉 All of today's tasks done! Bunting is up in the cottage", "🎉 All of today's tasks done! Sunflowers on the dining table", "🎉 All of today's tasks done! Balloons tied to a chair"],
         wait: n => `is waiting by the bowl for ${n.toLowerCase()}`, grooming: 'is grooming, very thoroughly',
@@ -586,14 +587,46 @@ const hhmm = m => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(
 const dateEl = $('date');
 // ---- 陪猫玩：积分在 bot 那边扣，bot 给的链接带 ?play=玩法&until=结束时间 ----
 const QS = (() => { try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(); } })();
-let playKind = ['yarn', 'wand', 'box', 'bubble'].includes(QS.get('play')) ? QS.get('play') : null;
+let playKind = ['yarn', 'wand', 'box', 'bubble', 'fireworks'].includes(QS.get('play')) ? QS.get('play') : null;
 let playUntil = playKind ? (parseInt(QS.get('until'), 10) || 0) * 1000 : 0;
 if (playUntil > Date.now() + 70000) playUntil = Date.now() + 60000;  // clock skew guard: never more than ~1 minute
 function playLeft() { return playKind && Date.now() < playUntil ? Math.ceil((playUntil - Date.now()) / 1000) : 0; }
 function heart(hx, hy) {
   R(hx, hy, 2, 1, '#ff6f91'); R(hx + 3, hy, 2, 1, '#ff6f91'); R(hx, hy + 1, 5, 1, '#ff6f91'); R(hx + 1, hy + 2, 3, 1, '#ff6f91'); R(hx + 2, hy + 3, 1, 1, '#ff6f91');
 }
+// ---- fireworks (night only; the bot picks it only after dark) ----
+let fwFlash = null; // [colour, strength] of the freshest burst, tints the window panes
+function drawFireworks(t) {
+  fwFlash = null;
+  const COLS = ['#ff6f91', '#ffd27a', '#8fd6ff', '#b8f08a', '#c9a0f0', '#ff9a5a'];
+  for (let i = 0; i < 4; i++) {
+    const PER = 2.4, tt = t + i * 0.61, c = Math.floor(tt / PER), ph = (tt / PER) % 1, r = rng(c * 13 + i * 101);
+    // keep bursts where the sky is visible: above the roof, or out to the sides
+    const side = r() < 0.5, x = side ? Math.round(r() < 0.5 ? 6 + r() * 20 : 206 + r() * 20) : Math.round(40 + r() * (W - 80));
+    const y = side ? Math.round(14 + r() * 40) : Math.round(6 + r() * 12);
+    const col = COLS[Math.floor(r() * COLS.length)], col2 = COLS[Math.floor(r() * COLS.length)];
+    if (ph < 0.28) {                      // rocket climbing (behind the house)
+      const ry = Math.round(124 - (124 - y) * (ph / 0.28));
+      R(x, ry, 1, 2, '#fff6d0'); g.globalAlpha = 0.5; R(x, ry + 2, 1, 3, '#ffd27a'); g.globalAlpha = 1;
+    } else if (ph < 0.9) {                // burst: two rings of sparks that spread, droop and fade
+      const q = (ph - 0.28) / 0.62, rad = 3 + q * 15, fall = q * q * 6;
+      if (q < 0.12) { g.globalAlpha = 1 - q / 0.12; R(x - 2, y - 2, 5, 5, '#ffffff'); }
+      g.globalAlpha = Math.max(0, 1 - q * 1.1);
+      for (let k = 0; k < 16; k++) {
+        const a = k / 16 * Math.PI * 2 + c;
+        const px = Math.round(x + Math.cos(a) * rad), py = Math.round(y + Math.sin(a) * rad + fall);
+        R(px, py, 2, 2, col);
+        R(Math.round(x + Math.cos(a) * rad * 0.8), Math.round(y + Math.sin(a) * rad * 0.8 + fall * 0.8), 1, 1, col); // trail
+        if (k % 2 === 0) R(Math.round(x + Math.cos(a + 0.2) * rad * 0.55), Math.round(y + Math.sin(a + 0.2) * rad * 0.55 + fall * 0.6), 1, 1, q < 0.5 ? '#ffffff' : col2);
+      }
+      g.globalAlpha = 1;
+      if (q < 0.35 && (!fwFlash || fwFlash[1] < (0.35 - q) / 0.35)) fwFlash = [col, (0.35 - q) / 0.35];
+    }
+  }
+}
+
 function drawPlay(kind, t) {
+  if (kind === 'fireworks') return drawCat(119, 25, 1, 'sit', 0, 1);   // sitting on the study windowsill
   if (kind === 'yarn') {           // a ball of yarn rolls back and forth across the kitchen floor
     const bx = 90 + 17 * Math.sin(t * 1.1), dir = Math.cos(t * 1.1) >= 0 ? 1 : -1; // cat stays between x 57 and 123
     for (let k = 1; k < 6; k++) L(Math.round(bx - dir * k * 2), 89, 1, 1, '#f28fb0');
@@ -618,14 +651,36 @@ function drawPlay(kind, t) {
     L(46, 30, 4, 2, '#d8a76a'); L(65, 30, 4, 2, '#d8a76a'); L(55, 35, 5, 2, '#a8743a');
     return pos;
   }
-  // bubbles drift up in the kitchen; the cat bats at them
-  for (let i = 0; i < 6; i++) {
-    const p = (t * 0.22 + i / 6) % 1, x = Math.round(72 + i * 7 + Math.sin(p * 6 + i) * 3), y = Math.round(88 - p * 34);
-    g.globalAlpha = 1 - p * 0.6;
+  // bubbles: background ones drift up; every 1.6 s the cat walks under one, leaps, swats it and it pops
+  const bub = (x, y, a) => {
+    g.globalAlpha = a;
     L(x, y - 1, 2, 1, '#bfe6ff'); L(x - 1, y, 1, 2, '#bfe6ff'); L(x + 2, y, 1, 2, '#bfe6ff'); L(x, y + 2, 2, 1, '#bfe6ff'); L(x, y, 1, 1, '#ffffff');
+    g.globalAlpha = 1;
+  };
+  for (let i = 0; i < 4; i++) {
+    const p = (t * 0.18 + i / 4) % 1;
+    bub(Math.round(64 + i * 14 + Math.sin(p * 6 + i) * 3), Math.round(86 - p * 32), 0.7 - p * 0.5);
   }
-  g.globalAlpha = 1;
-  return drawCat(86, 90, 1, Math.floor(t * 3) % 2 ? 'groom' : 'sit', Math.floor(t * 3) % 2, 1);
+  const PER = 1.6, c = Math.floor(t / PER), ph = (t / PER) % 1;
+  const spot = k => 60 + Math.floor(rng(k * 7 + 3)() * 46);           // cat x for cycle k, stays on the open floor
+  const from = spot(c - 1), to = spot(c), dir = to >= from ? 1 : -1;
+  let x = to, up = 0, pose = 'sit';
+  if (ph < 0.3) { x = from + (to - from) * (ph / 0.3); pose = 'walk'; }   // trot over
+  else if (ph < 0.7) { up = Math.round(Math.sin((ph - 0.3) / 0.4 * Math.PI) * 10); pose = 'walk'; } // leap
+  const headX = dir > 0 ? x + 12 : x + 1;                                 // front of the cat
+  const target = { x: headX + dir * 2, y: 90 - 22 };
+  if (ph < 0.5) bub(target.x, target.y + Math.round(Math.sin(t * 3) * 1), 1);      // the bubble it's going for
+  else if (ph < 0.62) {                                                   // pop!
+    g.globalAlpha = 1 - (ph - 0.5) / 0.12;
+    [[-2, -2], [3, -2], [-2, 3], [3, 3], [0, -3], [0, 4]].forEach(([dx, dy]) => L(target.x + dx, target.y + dy, 1, 1, '#ffffff'));
+    g.globalAlpha = 1;
+  }
+  const pos = drawCat(x, 90 - up, dir, pose, Math.floor(t * 8) % 2, 1);
+  if (ph >= 0.4 && ph < 0.62) { // paw stretched up at the top of the leap
+    const pxp = dir > 0 ? pos[0] + 12 : pos[0] + 1;
+    R(pxp, pos[1] + 1, 2, 2, '#f8dcae'); R(pxp, pos[1] + 3, 2, 1, '#e8963f');
+  }
+  return pos;
 }
 // ---- 当天任务清空的奖励：bot 的"去看看"链接会带上 ?clear=今天日期 ----
 const CLEAR_PARAM = (() => { try { return new URLSearchParams(location.search).get('clear'); } catch (e) { return null; } })();
@@ -709,7 +764,9 @@ function frame(ts) {
   const lightsOn = night > 0.15 && m >= WAKE && m < SLEEP; // lights on whenever it's dark and the cat is up
   const bedLamp = lightsOn;
 
-  drawSky(m, t); drawLand(m, t); drawRoof(t);
+  drawSky(m, t);
+  if (playing && playKind === 'fireworks') drawFireworks(t); else fwFlash = null;
+  drawLand(m, t); drawRoof(t);
   L(0, 0, 180, 96, '#5c3d29'); L(0, 0, 180, 1, '#7a5236');
   bedroom(m, bedLamp); study(m, lightsOn); kitchen(m, lightsOn, !!st.food); bathroom();
   const party = isParty(d), decor = seed % 3;
