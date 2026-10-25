@@ -42,6 +42,7 @@ h1{font-size:28px;margin:0;font-weight:400;letter-spacing:.06em;text-wrap:balanc
 canvas{display:block;width:100%;max-width:100%;height:auto;aspect-ratio:220/172;image-rendering:pixelated;image-rendering:crisp-edges;background:#7cc4ee}
 .panel{background:var(--paper);color:var(--ink);border:3px solid var(--wood-dark);box-shadow:0 3px 0 #22170f;padding:12px 14px;border-radius:3px}
 .status{font-size:18px;display:flex;gap:10px;align-items:center;min-height:1.6em}
+.party{background:var(--accent);color:#fff8ec;font-size:17px;border-color:var(--wood-dark)}
 .status .dot{width:10px;height:10px;background:var(--accent);flex:none}
 .controls{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
 .controls label{font-size:15px;color:var(--muted)}
@@ -77,6 +78,8 @@ summary:focus-visible{outline:3px solid #ffd27a;outline-offset:2px}
   </header>
 
   <div class="scene"><canvas id="c"></canvas></div>
+
+  <div class="panel party" id="party" hidden><span id="party-text"></span></div>
 
   <div class="panel status" aria-live="polite"><span class="dot"></span><span id="status">…</span></div>
 
@@ -410,12 +413,14 @@ const I18N = {
   zh: { title: '猫猫小屋', sub: '初夏 · 晴', routine: '猫猫的作息', breakfast: '早饭', lunch: '午饭', dinner: '晚饭',
         bed: '睡觉', groom: '舔毛', random: '随机', about: '约 ', preview: '时间预览', back: '回到现在', now: '现在',
         cat: '猫猫', walking: '猫猫正在走过去…', sleep: '在床上睡觉，晚安', eat: n => `在吃${n}`, wait: n => `蹲在碗边等${n}`,
+        party: ['🎉 今天的任务全部完成！小屋挂上了彩旗', '🎉 今天的任务全部完成！餐桌上多了一束向日葵', '🎉 今天的任务全部完成！椅子上绑了一串气球'],
         grooming: '在舔毛，认真打理自己', toilet: '上厕所', toiletWhen: '每天 4 次',
         pee: '在马桶上小便', poo: '在马桶上大便，请勿打扰', flush: '冲完马桶了，很讲卫生',
         aria: '像素风小房子：卧室、书房、厨房餐厅和卫生间，一只橘猫在屋里活动' },
   en: { title: 'Cat Cottage', sub: 'Early summer · Sunny', routine: "The cat's day", breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
         bed: 'Bedtime', groom: 'Grooming', random: 'Random', about: '~', preview: 'Preview time', back: 'Back to now', now: 'Now',
         cat: 'The cat ', walking: 'The cat is on its way…', sleep: 'is asleep in bed. Good night', eat: n => `is having ${n.toLowerCase()}`,
+        party: ["🎉 All of today's tasks done! Bunting is up in the cottage", "🎉 All of today's tasks done! Sunflowers on the dining table", "🎉 All of today's tasks done! Balloons tied to a chair"],
         wait: n => `is waiting by the bowl for ${n.toLowerCase()}`, grooming: 'is grooming, very thoroughly',
         toilet: 'Toilet', toiletWhen: '4 times a day', pee: 'is having a wee on the toilet',
         poo: 'is doing a number two. Privacy, please', flush: 'has flushed. Very tidy',
@@ -513,6 +518,44 @@ const $ = id => document.getElementById(id);
 const slider = $('slider'), ptime = $('ptime'), statusEl = $('status'), clockEl = $('clock');
 const hhmm = m => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.floor(m % 60)).padStart(2, '0')}`;
 const dateEl = $('date');
+// ---- 当天任务清空的奖励：bot 的"去看看"链接会带上 ?clear=今天日期 ----
+const CLEAR_PARAM = (() => { try { return new URLSearchParams(location.search).get('clear'); } catch (e) { return null; } })();
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+let partyDay = '', partyOn = false, partyShown = null;
+function isParty(d) {
+  const today = ymd(d);
+  if (today === partyDay) return partyOn;
+  partyDay = today;
+  partyOn = location.hash === '#party';
+  if (CLEAR_PARAM === today) { partyOn = true; try { localStorage.setItem('cat-clear', today); } catch (e) {} }
+  else { try { if (localStorage.getItem('cat-clear') === today) partyOn = true; } catch (e) {} }
+  return partyOn;
+}
+// 当天限定装饰：0 彩旗 / 1 向日葵 / 2 气球（按日期轮换，和 bot 的 cat.py 一致）
+function drawDecor(kind, t) {
+  if (kind === 0) { // bunting across both upstairs rooms
+    const COLS = ['#e8584a', '#f2c46d', '#6f9fd8', '#9bbb59', '#c9a0f0'];
+    for (const [x0, x1] of [[4, 81], [87, 165]]) {
+      for (let x = x0; x < x1; x++) { const sag = Math.round(2 * Math.sin(Math.PI * (x - x0) / (x1 - x0))); L(x, 4 + sag, 1, 1, '#7a5236'); }
+      for (let x = x0 + 2, i = 0; x < x1 - 4; x += 7, i++) {
+        const sag = Math.round(2 * Math.sin(Math.PI * (x + 2 - x0) / (x1 - x0))), c = COLS[i % COLS.length];
+        L(x, 5 + sag, 5, 1, c); L(x + 1, 6 + sag, 3, 1, c); L(x + 2, 7 + sag, 1, 1, c);
+      }
+    }
+  } else if (kind === 1) { // sunflowers in a vase on the dining table
+    L(83, 71, 5, 5, '#6f9fd8'); L(83, 71, 5, 1, '#8fb7e6'); 
+    L(84, 63, 1, 8, '#4f9a4a'); L(86, 65, 1, 6, '#4f9a4a'); L(82, 67, 2, 1, '#4f9a4a');
+    L(82, 60, 5, 4, '#f7c531'); L(83, 59, 3, 6, '#f7c531'); L(83, 61, 3, 2, '#7a4a20');
+    L(86, 63, 4, 3, '#f7c531'); L(87, 62, 2, 5, '#f7c531'); L(87, 63, 2, 2, '#7a4a20');
+  } else { // balloons tied to the left dining chair, bobbing gently
+    const bob = reduced ? 0 : Math.round(Math.sin(t * 1.5));
+    [[66, 55, '#e8584a'], [71, 52, '#6f9fd8'], [76, 56, '#f2c46d']].forEach(([x, y, c], i) => {
+      const yy = y + (i === 1 ? -bob : bob);
+      for (let k = yy + 6; k < 71; k++) L(73 + Math.round((x + 2 - 73) * (71 - k) / (71 - yy - 6)), k, 1, 1, '#d9d0c0');
+      L(x, yy + 1, 5, 4, c); L(x + 1, yy, 3, 6, c); L(x + 1, yy + 1, 1, 2, '#ffffff'); L(x + 2, yy + 6, 1, 1, c);
+    });
+  }
+}
 let lastDate = '';
 // 中文：10月25日 周日；English (UK): Sun 25 Oct — month spelled out so it never reads as a number order
 const EN_DAY = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], EN_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -532,7 +575,7 @@ function applyLang() {
   cv.setAttribute('aria-label', T('aria'));
   if (preview === null) ptime.textContent = T('now');
   document.querySelectorAll('.lang button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === LANG)));
-  lastTxt = ''; lastDate = '';
+  lastTxt = ''; lastDate = ''; partyShown = null;
 }
 document.querySelectorAll('.lang button').forEach(b => b.addEventListener('click', () => {
   LANG = b.dataset.lang;
@@ -557,6 +600,8 @@ function frame(ts) {
   drawSky(m, t); drawLand(m, t); drawRoof(t);
   L(0, 0, 168, 96, '#5c3d29'); L(0, 0, 168, 1, '#7a5236');
   bedroom(m, bedLamp); study(m, lightsOn); kitchen(m, lightsOn, !!st.food); bathroom();
+  const party = isParty(d), decor = seed % 3;
+  if (party) drawDecor(decor, t);
 
   const pose = cat.walking ? 'walk' : st.pose;
   const rate = { walk: 5, eat: 3, groom: 2, sleep: 0.7, sit: 0 }[pose];
@@ -579,7 +624,17 @@ function frame(ts) {
     const zx = csx + 11 + p * 6, zy = csy - 1 - p * 10;
     R(zx, zy, 3, 1, '#f6f1ff'); R(zx + 1, zy + 1, 1, 1, '#f6f1ff'); R(zx, zy + 2, 3, 1, '#f6f1ff');
   }
+  if (party && cat.alpha > 0.9 && !reduced) { // little hearts float up above the cat now and then
+    const p = (t * 0.4) % 1;
+    if (p < 0.6) {
+      g.globalAlpha = 1 - p / 0.6;
+      const hx = csx + 5, hy = csy - 2 - Math.round(p * 12);
+      R(hx, hy, 2, 1, '#ff6f91'); R(hx + 3, hy, 2, 1, '#ff6f91'); R(hx, hy + 1, 5, 1, '#ff6f91'); R(hx + 1, hy + 2, 3, 1, '#ff6f91'); R(hx + 2, hy + 3, 1, 1, '#ff6f91');
+    }
+  }
   g.globalAlpha = 1;
+  const pk = party ? LANG + decor : '';
+  if (pk !== partyShown) { partyShown = pk; $('party').hidden = !party; if (party) $('party-text').textContent = T('party')[decor]; }
 
   clockEl.textContent = hhmm(m);
   const ds = fmtDate(d);
