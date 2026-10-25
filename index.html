@@ -24,6 +24,7 @@ body{margin:0;font-size:14px;font-family:system-ui,sans-serif}
   color-scheme:dark;
 }
 html,body{background:var(--bg)}
+[hidden]{display:none!important}
 body{color:var(--paper);font-family:var(--pix);
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
 main{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
@@ -35,11 +36,12 @@ h1{font-size:28px;margin:0;font-weight:400;letter-spacing:.06em;text-wrap:balanc
 .lang button{box-shadow:none;border:0;padding:4px 10px;font-size:14px;background:var(--wood);color:#e8d3b0}
 .lang button[aria-pressed="true"]{background:var(--accent);color:#fff8ec}
 .lang button:active{transform:none}
+
 .when{display:flex;align-items:baseline;gap:10px}
 .date{font-size:16px;color:#cdb38e;letter-spacing:.04em}
 .clock{font-size:22px;font-variant-numeric:tabular-nums;color:var(--accent)}
 .scene{background:var(--wood);border:4px solid var(--wood-dark);box-shadow:inset 0 0 0 2px var(--wood-light),0 4px 0 #22170f;padding:6px;border-radius:4px}
-canvas{display:block;width:100%;max-width:100%;height:auto;aspect-ratio:220/172;image-rendering:pixelated;image-rendering:crisp-edges;background:#7cc4ee}
+canvas{display:block;width:100%;max-width:100%;height:auto;aspect-ratio:232/172;image-rendering:pixelated;image-rendering:crisp-edges;background:#7cc4ee}
 .panel{background:var(--paper);color:var(--ink);border:3px solid var(--wood-dark);box-shadow:0 3px 0 #22170f;padding:12px 14px;border-radius:3px}
 .status{font-size:18px;display:flex;gap:10px;align-items:center;min-height:1.6em}
 .party{background:var(--accent);color:#fff8ec;font-size:17px;border-color:var(--wood-dark)}
@@ -70,7 +72,7 @@ summary:focus-visible{outline:3px solid #ffd27a;outline-offset:2px}
     <h1><span data-i="title">猫猫小屋</span><span class="sub" data-i="sub" hidden>初夏 · 晴</span></h1>
     <div class="right">
       <div class="lang" role="group" aria-label="Language">
-        <button type="button" id="lang-zh" data-lang="zh" aria-pressed="true">中文</button>
+        <button type="button" id="lang-zh" data-lang="zh" aria-pressed="true">CN</button>
         <button type="button" id="lang-en" data-lang="en" aria-pressed="false">EN</button>
       </div>
       <div class="when"><span class="date" id="date"></span><span class="clock" id="clock">--:--</span></div>
@@ -83,7 +85,7 @@ summary:focus-visible{outline:3px solid #ffd27a;outline-offset:2px}
 
   <div class="panel status" aria-live="polite"><span class="dot"></span><span id="status">…</span></div>
 
-  <details class="panel" id="routine">
+  <details class="panel" id="routine" hidden>
     <summary data-i="routine">猫猫的作息</summary>
     <ul class="sched" id="sched">
       <li data-k="eat540"><span data-i="breakfast">早饭</span><span class="t" data-about="09:00">09:00</span></li>
@@ -95,7 +97,7 @@ summary:focus-visible{outline:3px solid #ffd27a;outline-offset:2px}
     </ul>
   </details>
 
-  <div class="panel controls">
+  <div class="panel controls" hidden>
     <label for="slider" data-i="preview">时间预览</label>
     <input type="range" id="slider" min="0" max="1435" step="5" value="720">
     <span class="ptime" id="ptime">现在</span>
@@ -105,7 +107,7 @@ summary:focus-visible{outline:3px solid #ffd27a;outline-offset:2px}
 
 <script>
 (() => {
-const W = 220, H = 172, HX = 26, HY = 48;
+const W = 232, H = 172, HX = 26, HY = 48;
 const cv = document.getElementById('c');
 cv.width = W; cv.height = H;
 const g = cv.getContext('2d');
@@ -121,7 +123,8 @@ let NK = 0, dl = 1, night = 0, skyTop = C('#7cc4ee'), skyBot = C('#c8ecfa');
 const sh = h => S(lerp(C(h), NIGHT, NK));                 // outdoor colours dim at night
 const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
 const O = (x, y, w, h, c) => R(x, y, w, h, sh(c));        // outdoors
-const L = (x, y, w, h, c) => R(HX + x, HY + y, w, h, c);  // inside the house
+let OX = 0; // horizontal offset while drawing a room that moved right when the house got wider
+const L = (x, y, w, h, c) => R(HX + OX + x, HY + y, w, h, c);  // inside the house
 const LO = (x, y, w, h, c) => R(HX + x, HY + y, w, h, sh(c)); // house exterior (roof)
 
 const kfc = fr => fr.map(([m, v]) => [m, typeof v === 'string' ? C(v) : v]);
@@ -132,10 +135,31 @@ function kf(fr, m) {
   }
   return fr[fr.length - 1][1];
 }
-// early-summer day: dawn ~5:00, sunset ~21:30
-const SKYT = kfc([[0,'#0e1233'],[290,'#0e1233'],[330,'#4a3f7a'],[370,'#f0a07a'],[420,'#7cc4ee'],[1190,'#7cc4ee'],[1250,'#e88a5c'],[1295,'#3d2f66'],[1340,'#0e1233'],[1440,'#0e1233']]);
-const SKYB = kfc([[0,'#1d2552'],[290,'#1d2552'],[330,'#e59a7a'],[370,'#ffd59a'],[420,'#c8ecfa'],[1190,'#c8ecfa'],[1250,'#ffc27a'],[1295,'#a0607a'],[1340,'#1d2552'],[1440,'#1d2552']]);
-const DLF = [[0,0],[290,0],[420,1],[1190,1],[1320,0],[1440,0]];
+// Seasons follow the real calendar (UK meteorological seasons). Sunrise/sunset are the UK
+// seasonal averages in local clock time (minutes after midnight). Keep in sync with bot's cat.py.
+const SUN = { spring: [360, 1180], summer: [310, 1255], autumn: [415, 1070], winter: [465, 990] };
+const seasonOf = mo => (mo >= 2 && mo <= 4) ? 'spring' : (mo >= 5 && mo <= 7) ? 'summer' : (mo >= 8 && mo <= 10) ? 'autumn' : 'winter';
+function dlfFor(season) { const [sr, ss] = SUN[season]; return [[0,0],[sr - 60,0],[sr + 30,1],[ss - 30,1],[ss + 60,0],[1440,0]]; }
+const DAYSKY = { spring: ['#80c8f0', '#d0eefa'], summer: ['#7cc4ee', '#c8ecfa'], autumn: ['#86bfe2', '#d6eaf2'], winter: ['#9cc5e2', '#e2edf3'] };
+function skyFor(season) {
+  const [sr, ss] = SUN[season], [dt, db] = DAYSKY[season];
+  return [
+    kfc([[0,'#0e1233'],[sr-70,'#0e1233'],[sr-30,'#4a3f7a'],[sr+10,'#f0a07a'],[sr+60,dt],[ss-60,dt],[ss,'#e88a5c'],[ss+45,'#3d2f66'],[ss+90,'#0e1233'],[1440,'#0e1233']]),
+    kfc([[0,'#1d2552'],[sr-70,'#1d2552'],[sr-30,'#e59a7a'],[sr+10,'#ffd59a'],[sr+60,db],[ss-60,db],[ss,'#ffc27a'],[ss+45,'#a0607a'],[ss+90,'#1d2552'],[1440,'#1d2552']]),
+  ];
+}
+const PAL = {
+  spring: { hill1: '#94c878', hill2: '#7fb865', ground: '#76b65a', top: '#a0d27e', tuft: '#5a9a44',
+            leaf: '#55a052', leafDk: '#3f8a44', leafLt: '#7cc070', dots: ['#f5b8cc', '#ffffff'], flowers: ['#f5b8cc','#ffe066','#ffffff','#f5b8cc'] },
+  summer: { hill1: '#86b86d', hill2: '#73a95b', ground: '#6aa84f', top: '#8fc46e', tuft: '#4f8a3b',
+            leaf: '#3f8a44', leafDk: '#2f6e38', leafLt: '#5aa858', dots: ['#e8584a'], flowers: ['#f28fb0','#ffe066','#ffffff','#c9a0f0'] },
+  autumn: { hill1: '#b3aa62', hill2: '#9c9a55', ground: '#8f9a4e', top: '#b2b46c', tuft: '#6e7a3a',
+            leaf: '#d9822b', leafDk: '#a8502a', leafLt: '#f0b04a', dots: ['#c0402a'], flowers: ['#d9822b','#c0502b','#e8b04a','#a8502a'] },
+  winter: { hill1: '#dfe8ee', hill2: '#cfdbe3', ground: '#e9f0f4', top: '#ffffff', tuft: '#a9b8c2',
+            leaf: null, leafDk: null, leafLt: null, dots: [], flowers: [] },
+};
+let SEASON = seasonOf(new Date().getMonth()), P = PAL[SEASON], DLF = dlfFor(SEASON);
+let [SKYT, SKYB] = skyFor(SEASON);
 
 // ---------- deterministic randomness per day ----------
 function rng(seed) { let a = seed >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -150,15 +174,16 @@ function drawSky(m, t) {
     for (const [x, y, p] of STARS) { g.globalAlpha = Math.min(1, night * 1.2) * (0.55 + 0.45 * Math.sin(t * 1.6 + p)); R(x, y, 1, 1, '#fff6d0'); }
     g.globalAlpha = 1;
   }
-  if (m > 320 && m < 1300) { // sun
-    const p = (m - 320) / 980, x = 6 + p * 206, y = 62 - Math.sin(Math.PI * p) * 54;
+  const [sr, ss] = SUN[SEASON];
+  if (m > sr - 20 && m < ss + 20) { // sun
+    const p = (m - sr + 20) / (ss - sr + 40), x = 6 + p * (W - 14), y = 62 - Math.sin(Math.PI * p) * (SEASON === 'winter' ? 40 : 54);
     g.globalAlpha = 0.25; R(x - 5, y - 4, 10, 8, '#fff2b0'); R(x - 4, y - 5, 8, 10, '#fff2b0'); g.globalAlpha = 1;
     R(x - 3, y - 2, 6, 4, '#ffe27a'); R(x - 2, y - 3, 4, 6, '#ffe27a'); R(x - 1, y - 2, 2, 1, '#fff6c8');
   }
-  if (night > 0.35) { // crescent moon
+  if (night > 0.35 && (m > ss + 20 || m < sr - 20)) { // crescent moon, once the sun is down
     g.globalAlpha = Math.min(1, (night - 0.35) * 2.5);
-    R(198, 9, 6, 8, '#f4eccd'); R(197, 10, 8, 6, '#f4eccd');
-    R(200, 8, 6, 8, S(skyTop)); R(201, 9, 6, 6, S(skyTop));
+    R(210, 9, 6, 8, '#f4eccd'); R(209, 10, 8, 6, '#f4eccd');
+    R(212, 8, 6, 8, S(skyTop)); R(213, 9, 6, 6, S(skyTop));
     g.globalAlpha = 1;
   }
   const cc = S(lerp(lerp(C('#ffffff'), C('#ffd2b8'), Math.max(0, 1 - dl) * 0.8), C('#2e3360'), night * 0.85));
@@ -169,27 +194,45 @@ function drawSky(m, t) {
 }
 
 function drawLand(m, t) {
-  for (let x = 0; x < W; x += 2) { const h = Math.round(126 + 5 * Math.sin(x / 23) + 3 * Math.sin(x / 9 + 1)); O(x, h, 2, 144 - h, '#86b86d'); }
-  for (let x = 0; x < W; x += 2) { const h = Math.round(134 + 3 * Math.sin(x / 15 + 2)); O(x, h, 2, 144 - h, '#73a95b'); }
-  O(0, 144, W, 28, '#6aa84f'); O(0, 144, W, 1, '#8fc46e');
-  for (const [x, y] of TUFTS) { O(x, y, 1, 2, '#4f8a3b'); O(x + 2, y + 1, 1, 1, '#4f8a3b'); }
-  for (const [x, y, c] of FLOWERS) { O(x, y, 1, 1, c); O(x, y + 1, 1, 1, '#4f8a3b'); }
+  for (let x = 0; x < W; x += 2) { const h = Math.round(126 + 5 * Math.sin(x / 23) + 3 * Math.sin(x / 9 + 1)); O(x, h, 2, 144 - h, P.hill1); }
+  for (let x = 0; x < W; x += 2) { const h = Math.round(134 + 3 * Math.sin(x / 15 + 2)); O(x, h, 2, 144 - h, P.hill2); }
+  O(0, 144, W, 28, P.ground); O(0, 144, W, 1, P.top);
+  for (const [x, y] of TUFTS) { O(x, y, 1, 2, P.tuft); O(x + 2, y + 1, 1, 1, P.tuft); }
+  if (SEASON === 'autumn') { // fallen leaves instead of flowers
+    FLOWERS.forEach(([x, y], i) => { if (i % 2 === 0) O(x, y, 2, 1, P.flowers[i % 4]); });
+  } else if (P.flowers.length) {
+    FLOWERS.forEach(([x, y], i) => { const c = P.flowers[i % 4]; O(x, y, 1, 1, c); O(x, y + 1, 1, 1, P.tuft); });
+  }
   // door step + a dirt path winding from the front door down the lawn
   for (let y = 144; y < H; y++) {
     const k = y - 144, w = 8 + Math.floor(k / 9), cx = 33 + Math.round(k * 0.6 + 2 * Math.sin(k / 5));
-    O(cx - (w >> 1), y, w, 1, '#c9a878');
+    O(cx - (w >> 1), y, w, 1, SEASON === 'winter' ? '#d9ccb6' : '#c9a878');
     O(cx - (w >> 1), y, 1, 1, '#a88a5e'); O(cx - (w >> 1) + w - 1, y, 1, 1, '#a88a5e');
   }
   [[31, 151], [37, 158], [43, 165], [36, 168]].forEach(([x, y]) => O(x, y, 2, 1, '#b39468'));
   O(HX - 1, 144, 17, 2, '#b9b0a0'); O(HX - 1, 144, 17, 1, '#d3cbbb');
-  tree(12, 146); tree(208, 146);
-  if (dl > 0.6) { // butterfly
+  tree(12, 146); tree(220, 146);
+  if (SEASON === 'autumn' && !reduced) { // a few leaves drifting down from the trees
+    for (let i = 0; i < 4; i++) {
+      const p = (t * 0.08 + i / 4) % 1, x0 = i % 2 ? 220 : 12;
+      O(x0 - 8 + i * 4 + Math.sin(p * 9 + i) * 4, 112 + p * 34, 2, 1, P.flowers[i % 3]);
+    }
+  }
+  if (SEASON === 'winter' && !reduced) { // gentle snowfall
+    for (let i = 0; i < 26; i++) {
+      const r = rng(i * 41 + 9), x0 = r() * W, sp = 0.5 + r() * 0.6, ph = r();
+      const y = ((t * 6 * sp + ph * H) % H), x = (x0 + Math.sin(t * 0.7 + i) * 3) % W;
+      g.globalAlpha = 0.85; R(x, y, 1, 1, '#ffffff');
+    }
+    g.globalAlpha = 1;
+  }
+  if (dl > 0.6 && (SEASON === 'spring' || SEASON === 'summer')) { // butterfly
     const bx = 70 + 46 * Math.sin(t * 0.27), by = 153 + 5 * Math.sin(t * 1.3), up = Math.floor(t * 8) % 2;
     R(bx, by, 1, 2, '#5a4030');
     if (up) { R(bx - 2, by - 1, 2, 2, '#fff1a0'); R(bx + 1, by - 1, 2, 2, '#fff1a0'); }
     else { R(bx - 2, by + 1, 2, 1, '#fff1a0'); R(bx + 1, by + 1, 2, 1, '#fff1a0'); }
   }
-  if (night > 0.5) { // fireflies
+  if (night > 0.5 && SEASON === 'summer') { // fireflies
     for (let i = 0; i < 7; i++) {
       const r = rng(i * 17 + 3), x = r() * W, y = 132 + r() * 34, ph = r() * 6;
       g.globalAlpha = night * Math.max(0, Math.sin(t * 1.4 + ph));
@@ -200,34 +243,45 @@ function drawLand(m, t) {
 }
 
 function tree(cx, b) {
-  O(cx - 2, b - 18, 4, 18, '#7a5234'); O(cx - 1, b - 18, 1, 18, '#93673f');
-  O(cx - 9, b - 34, 18, 14, '#3f8a44'); O(cx - 7, b - 38, 14, 4, '#3f8a44'); O(cx - 11, b - 30, 22, 8, '#3f8a44');
-  O(cx - 10, b - 23, 20, 3, '#2f6e38');
-  O(cx - 6, b - 36, 6, 3, '#5aa858'); O(cx - 9, b - 30, 4, 3, '#5aa858'); O(cx + 3, b - 32, 3, 2, '#5aa858');
-  O(cx - 3, b - 27, 1, 1, '#e8584a'); O(cx + 5, b - 25, 1, 1, '#e8584a'); // tiny cherries: early summer
+  if (SEASON === 'winter') { // bare branches with a little snow
+    O(cx - 2, b - 30, 4, 30, '#6e4a30'); O(cx - 1, b - 30, 1, 30, '#86603e');
+    [[-1, -26, -8, -36], [1, -24, 9, -34], [-1, -18, -10, -24], [1, -16, 9, -22], [0, -30, 1, -40]].forEach(([x0, y0, x1, y1]) => {
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let k = 0; k <= n; k++) O(cx + Math.round(x0 + (x1 - x0) * k / n), b + Math.round(y0 + (y1 - y0) * k / n), 1, 1, '#6e4a30');
+      O(cx + x1 - 1, b + y1 - 1, 3, 1, '#ffffff');
+    });
+    return;
+  }
+  // trunk runs up into the canopy so the two always join
+  O(cx - 2, b - 24, 4, 24, '#7a5234'); O(cx - 1, b - 24, 1, 24, '#93673f');
+  O(cx - 9, b - 34, 18, 14, P.leaf); O(cx - 7, b - 38, 14, 4, P.leaf); O(cx - 11, b - 30, 22, 8, P.leaf);
+  O(cx - 10, b - 23, 20, 3, P.leafDk);
+  O(cx - 2, b - 20, 4, 2, '#7a5234'); O(cx - 1, b - 20, 1, 2, '#93673f');
+  O(cx - 6, b - 36, 6, 3, P.leafLt); O(cx - 9, b - 30, 4, 3, P.leafLt); O(cx + 3, b - 32, 3, 2, P.leafLt);
+  P.dots.forEach((c, i) => { O(cx - 3 + i * 4, b - 27 - i * 5, 1, 1, c); O(cx + 5 - i * 9, b - 25 - i * 6, 1, 1, c); O(cx - 7 + i * 3, b - 33, 1, 1, c); });
 }
 
 // ---------- house ----------
 function drawRoof(t) {
   for (let r = 0; r < 27; r++) {
-    const ins = r * 3, x = -6 + ins, w = 180 - 2 * ins, y = -1 - r;
-    LO(x, y, w, 1, r % 4 === 0 ? '#8e3b2e' : '#b5523e');
+    const ins = r * 3, x = -6 + ins, w = 192 - 2 * ins, y = -1 - r;
+    LO(x, y, w, 1, SEASON === 'winter' && r > 14 ? '#f4f7fa' : (r % 4 === 0 ? '#8e3b2e' : '#b5523e'));
     LO(x, y, 1, 1, '#6e2c22'); LO(x + w - 1, y, 1, 1, '#6e2c22');
   }
-  LO(128, -27, 9, 16, '#8c6a5a'); LO(127, -28, 11, 2, '#6f5246');
-  for (let i = 0; i < 3; i++) LO(129 + (i % 2) * 3, -24 + i * 4, 4, 1, '#735548');
+  LO(134, -27, 9, 16, '#8c6a5a'); LO(133, -28, 11, 2, SEASON === 'winter' ? '#f4f7fa' : '#6f5246');
+  for (let i = 0; i < 3; i++) LO(135 + (i % 2) * 3, -24 + i * 4, 4, 1, '#735548');
   if (dl > 0.4 && !reduced) for (let i = 0; i < 3; i++) { // chimney smoke
     const p = (t * 0.25 + i / 3) % 1; g.globalAlpha = (1 - p) * 0.55 * dl;
-    R(HX + 131 + Math.sin(p * 6 + i) * 3 + p * 6, HY - 31 - p * 16, 3, 3, '#eeeeee');
+    R(HX + 137 + Math.sin(p * 6 + i) * 3 + p * 6, HY - 31 - p * 16, 3, 3, '#eeeeee');
   }
   g.globalAlpha = 1;
-  LO(-6, -1, 180, 2, '#5a3a26');
+  LO(-6, -1, 192, 2, '#5a3a26');
 }
 
 function win(x, y, w, h, opt = {}) {
   L(x - 1, y - 1, w + 2, h + 2, '#7a5236');
   for (let yy = 0; yy < h; yy++) L(x, y + yy, w, 1, S(lerp(skyTop, skyBot, Math.min(1, (HY + y + yy) / 136))));
-  if (!opt.frost) { L(x, y + h - 3, w, 3, sh('#86b86d')); if (dl > 0.5) L(x + 2, y + h - 5, 3, 2, sh('#3f8a44')); }
+  if (!opt.frost) { L(x, y + h - 3, w, 3, sh(P.hill1)); if (dl > 0.5 && P.leaf) L(x + 2, y + h - 5, 3, 2, sh(P.leaf)); }
   if (night > 0.55 && !opt.frost) L(x + 2, y + 2, 1, 1, '#fff6d0');
   if (opt.frost) { g.globalAlpha = 0.55; L(x, y, w, h, '#eef7fa'); g.globalAlpha = 1; }
   L(x + (w >> 1), y, 1, h, '#7a5236'); L(x, y + (h >> 1), w, 1, '#7a5236');
@@ -242,9 +296,9 @@ function woodFloor(x, y, w) {
 }
 
 function bedroom(m, lightsOn) {
-  L(2, 2, 80, 40, '#ecd9a8');
-  for (let y = 6; y < 40; y += 8) for (let x = 6 + (y % 16 ? 4 : 0); x < 82; x += 8) L(x, y, 1, 1, '#dcc38d');
-  woodFloor(2, 42, 80);
+  L(2, 2, 86, 40, '#ecd9a8');
+  for (let y = 6; y < 40; y += 8) for (let x = 6 + (y % 16 ? 4 : 0); x < 88; x += 8) L(x, y, 1, 1, '#dcc38d');
+  woodFloor(2, 42, 86);
   win(47, 10, 16, 14, { curtain: '#e07f6a' });
   L(67, 8, 10, 8, '#7a5236'); L(68, 9, 8, 6, '#bfe3f2'); L(68, 12, 8, 3, '#7fb069'); L(73, 10, 2, 2, '#ffe27a'); // little painting
   L(46, 41, 30, 2, '#c97b84'); L(47, 41, 28, 1, '#d99aa1');                       // rug
@@ -262,9 +316,10 @@ function bedroom(m, lightsOn) {
 }
 
 function study(m, lightsOn) {
-  L(85, 2, 81, 40, '#cfdcb8');
-  for (let x = 88; x < 166; x += 6) L(x, 2, 1, 40, '#c2d0aa');
-  woodFloor(85, 42, 81);
+  OX = 6;
+  L(85, 2, 87, 40, '#cfdcb8');
+  for (let x = 88; x < 172; x += 6) L(x, 2, 1, 40, '#c2d0aa');
+  woodFloor(85, 42, 87);
   // bookshelf
   L(88, 8, 16, 34, '#7a5236'); L(89, 9, 14, 31, '#5a3a26');
   const BK = ['#c0504d','#4f81bd','#9bbb59','#f2c46d','#8064a2','#e07f6a','#4bacc6'];
@@ -275,7 +330,7 @@ function study(m, lightsOn) {
   win(112, 10, 16, 14, { curtain: '#d9a441' });
   // clock showing the scene's time
   L(152, 7, 11, 11, '#7a5236'); L(153, 8, 9, 9, '#f8f1de');
-  const cx = HX + 157, cy = HY + 12, ha = ((m / 60) % 12) / 12 * Math.PI * 2, ma = (m % 60) / 60 * Math.PI * 2;
+  const cx = HX + OX + 157, cy = HY + 12, ha = ((m / 60) % 12) / 12 * Math.PI * 2, ma = (m % 60) / 60 * Math.PI * 2;
   for (let i = 1; i <= 3; i++) R(cx + Math.round(Math.sin(ma) * i), cy - Math.round(Math.cos(ma) * i), 1, 1, '#4a3322');
   for (let i = 1; i <= 2; i++) R(cx + Math.round(Math.sin(ha) * i), cy - Math.round(Math.cos(ha) * i), 1, 1, '#c0504d');
   R(cx, cy, 1, 1, '#4a3322');
@@ -290,12 +345,13 @@ function study(m, lightsOn) {
   L(161, 24, 1, 7, '#4a4a4a'); L(158, 22, 4, 2, lightsOn ? '#ffd27a' : '#e2b45e');
   // plant
   L(106, 37, 5, 5, '#c0673f'); L(105, 32, 7, 5, '#4f9a4a'); L(107, 30, 2, 2, '#6dbb5f');
+  OX = 0;
 }
 
 function kitchen(m, lightsOn, eating) {
-  L(2, 50, 112, 40, '#f1dfb6');
-  for (let x = 2; x < 114; x += 4) L(x, 90, Math.min(4, 114 - x), 4, ((x >> 2) % 2) ? '#d9c7a4' : '#bba582');
-  L(2, 89, 112, 1, '#c9a878');
+  L(2, 50, 124, 40, '#f1dfb6');
+  for (let x = 2; x < 126; x += 4) L(x, 90, Math.min(4, 126 - x), 4, ((x >> 2) % 2) ? '#d9c7a4' : '#bba582');
+  L(2, 89, 124, 1, '#c9a878');
   // front door: flush with the house's left edge, running down through the floor line to the step
   L(0, 63, 15, 33, '#5a3a26'); L(1, 64, 13, 32, '#7a5236');
   L(2, 65, 11, 31, '#a8744a'); L(2, 65, 11, 1, '#b98252'); L(2, 65, 1, 31, '#b98252');
@@ -318,18 +374,23 @@ function kitchen(m, lightsOn, eating) {
   g.globalAlpha = 1;
   win(23, 55, 14, 11, { curtain: '#9bbb59' });
   // hanging lamp
-  L(93, 50, 1, 6, '#3a2a1a'); L(89, 56, 9, 3, '#e9b44c'); L(92, 59, 3, 1, lightsOn ? '#fff2c0' : '#d8c890');
-  // table + chairs + fruit
-  L(72, 70, 2, 20, '#8a5a36'); L(72, 80, 6, 2, '#a06a40'); L(76, 82, 1, 8, '#8a5a36');
-  L(111, 70, 2, 20, '#8a5a36'); L(107, 80, 6, 2, '#a06a40'); L(108, 82, 1, 8, '#8a5a36');
-  L(78, 76, 30, 2, '#a06a40'); L(78, 76, 30, 1, '#b98252'); L(80, 78, 26, 1, '#8a5a36'); L(80, 79, 2, 11, '#8a5a36'); L(104, 79, 2, 11, '#8a5a36');
-  L(90, 73, 7, 3, '#e8e0d0'); L(91, 71, 2, 2, '#e0533a'); L(94, 71, 2, 2, '#f2b33a'); L(93, 70, 1, 1, '#4f9a4a');
+  L(98, 50, 1, 6, '#3a2a1a'); L(94, 56, 9, 3, '#e9b44c'); L(97, 59, 3, 1, lightsOn ? '#fff2c0' : '#d8c890');
+  // table + two full-size chairs with room to sit
+  L(71, 68, 2, 22, '#8a5a36'); L(71, 68, 2, 1, '#a06a40');            // left chair back
+  L(71, 80, 8, 2, '#a06a40'); L(71, 80, 8, 1, '#b98252');              // left seat
+  L(77, 82, 1, 8, '#8a5a36');                                          // left front leg
+  L(123, 68, 2, 22, '#8a5a36'); L(123, 68, 2, 1, '#a06a40');          // right chair back
+  L(117, 80, 8, 2, '#a06a40'); L(117, 80, 8, 1, '#b98252');            // right seat
+  L(118, 82, 1, 8, '#8a5a36');                                         // right front leg
+  L(82, 76, 32, 2, '#a06a40'); L(82, 76, 32, 1, '#b98252'); L(84, 78, 28, 1, '#8a5a36'); L(84, 79, 2, 11, '#8a5a36'); L(110, 79, 2, 11, '#8a5a36');
+  L(95, 73, 7, 3, '#e8e0d0'); L(96, 71, 2, 2, '#e0533a'); L(99, 71, 2, 2, '#f2b33a'); L(98, 70, 1, 1, '#4f9a4a');
   // cat bowls, in the open floor between the fridge and the table
   L(58, 88, 6, 2, '#d9534f'); L(58, 88, 6, 1, '#e8736f'); if (eating) L(59, 87, 4, 1, '#8a5a36');
   L(65, 88, 5, 2, '#6f9fd8'); L(66, 87, 3, 1, '#bfe6ff');
 }
 
 function bathroom() {
+  OX = 12;
   L(117, 50, 49, 40, '#cfe4e8');
   for (let x = 117; x < 166; x += 4) L(x, 72, 1, 18, '#b8d2d8'); for (let y = 72; y < 90; y += 4) L(117, y, 49, 1, '#b8d2d8');
   for (let x = 117; x < 166; x += 4) L(x, 90, Math.min(4, 166 - x), 4, ((x >> 2) % 2) ? '#9fbfc8' : '#88aab5');
@@ -346,6 +407,7 @@ function bathroom() {
   L(150, 88, 2, 2, '#c9a878'); L(161, 88, 2, 2, '#c9a878');
   L(163, 75, 1, 4, '#9aa3a8'); L(161, 75, 3, 1, '#9aa3a8');
   L(152, 77, 4, 2, '#f7d23a'); L(155, 76, 2, 2, '#f7d23a'); L(157, 77, 1, 1, '#e8873a');
+  OX = 0;
 }
 
 // ---------- the cat ----------
@@ -413,6 +475,8 @@ const I18N = {
   zh: { title: '猫猫小屋', sub: '初夏 · 晴', routine: '猫猫的作息', breakfast: '早饭', lunch: '午饭', dinner: '晚饭',
         bed: '睡觉', groom: '舔毛', random: '随机', about: '约 ', preview: '时间预览', back: '回到现在', now: '现在',
         cat: '猫猫', walking: '猫猫正在走过去…', sleep: '在床上睡觉，晚安', eat: n => `在吃${n}`, wait: n => `蹲在碗边等${n}`,
+        playing: { yarn: '在追毛线球！', wand: '在扑逗猫棒上的羽毛！', box: '钻进了纸箱，只露出一个脑袋', bubble: '在拍泡泡' },
+        left: s => `（还剩 ${s} 秒）`,
         party: ['🎉 今天的任务全部完成！小屋挂上了彩旗', '🎉 今天的任务全部完成！餐桌上多了一束向日葵', '🎉 今天的任务全部完成！椅子上绑了一串气球'],
         grooming: '在舔毛，认真打理自己', toilet: '上厕所', toiletWhen: '每天 4 次',
         pee: '在马桶上小便', poo: '在马桶上大便，请勿打扰', flush: '冲完马桶了，很讲卫生',
@@ -420,6 +484,8 @@ const I18N = {
   en: { title: 'Cat Cottage', sub: 'Early summer · Sunny', routine: "The cat's day", breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
         bed: 'Bedtime', groom: 'Grooming', random: 'Random', about: '~', preview: 'Preview time', back: 'Back to now', now: 'Now',
         cat: 'The cat ', walking: 'The cat is on its way…', sleep: 'is asleep in bed. Good night', eat: n => `is having ${n.toLowerCase()}`,
+        playing: { yarn: 'is chasing a ball of yarn!', wand: 'is pouncing on the feather wand!', box: 'has squeezed into a box, only its head poking out', bubble: 'is batting at bubbles' },
+        left: s => ` (${s}s left)`,
         party: ["🎉 All of today's tasks done! Bunting is up in the cottage", "🎉 All of today's tasks done! Sunflowers on the dining table", "🎉 All of today's tasks done! Balloons tied to a chair"],
         wait: n => `is waiting by the bowl for ${n.toLowerCase()}`, grooming: 'is grooming, very thoroughly',
         toilet: 'Toilet', toiletWhen: '4 times a day', pee: 'is having a wee on the toilet',
@@ -432,15 +498,15 @@ const T = k => I18N[LANG][k];
 
 const MEALS = [[540, 'breakfast'], [720, 'lunch'], [1080, 'dinner']];
 const SLEEP = 1350, WAKE = 450;
-const BOWL = { x: 59, y: 90, dir: -1 }, BED = { x: 17, y: 33, dir: 1 }, LOO = { x: 119, y: 83, dir: 1 };
+const BOWL = { x: 59, y: 90, dir: -1 }, BED = { x: 17, y: 33, dir: 1 }, LOO = { x: 131, y: 83, dir: 1 };
 const IDLE = [
   { x: 52, y: 42, dir: -1, txt: { zh: '在卧室地毯上发呆', en: 'is daydreaming on the bedroom rug' } },
   { x: 20, y: 33, dir: -1, txt: { zh: '在床上打盹', en: 'is napping on the bed' }, lie: true },
-  { x: 113, y: 42, dir: 1, txt: { zh: '在书房窗边晒太阳', en: 'is sunbathing by the study window' },
+  { x: 119, y: 42, dir: 1, txt: { zh: '在书房窗边晒太阳', en: 'is sunbathing by the study window' },
     txtN: { zh: '在书房窗边看月亮', en: 'is watching the moon from the study window' } },
-  { x: 129, y: 31, dir: 1, txt: { zh: '霸占了书桌', en: 'has taken over the desk' } },
-  { x: 86, y: 90, dir: 1, txt: { zh: '躲在餐桌底下', en: 'is hiding under the dining table' } },
-  { x: 131, y: 90, dir: 1, txt: { zh: '在卫生间巡逻', en: 'is patrolling the bathroom' } },
+  { x: 135, y: 31, dir: 1, txt: { zh: '霸占了书桌', en: 'has taken over the desk' } },
+  { x: 91, y: 90, dir: 1, txt: { zh: '躲在餐桌底下', en: 'is hiding under the dining table' } },
+  { x: 143, y: 90, dir: 1, txt: { zh: '在卫生间巡逻', en: 'is patrolling the bathroom' } },
   { x: 30, y: 90, dir: -1, txt: { zh: '在厨房里转悠', en: 'is pottering around the kitchen' } },
 ];
 // each day: every meal starts up to 20 min early or late, and lasts 10–25 min
@@ -518,6 +584,49 @@ const $ = id => document.getElementById(id);
 const slider = $('slider'), ptime = $('ptime'), statusEl = $('status'), clockEl = $('clock');
 const hhmm = m => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.floor(m % 60)).padStart(2, '0')}`;
 const dateEl = $('date');
+// ---- 陪猫玩：积分在 bot 那边扣，bot 给的链接带 ?play=玩法&until=结束时间 ----
+const QS = (() => { try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(); } })();
+let playKind = ['yarn', 'wand', 'box', 'bubble'].includes(QS.get('play')) ? QS.get('play') : null;
+let playUntil = playKind ? (parseInt(QS.get('until'), 10) || 0) * 1000 : 0;
+if (playUntil > Date.now() + 70000) playUntil = Date.now() + 60000;  // clock skew guard: never more than ~1 minute
+function playLeft() { return playKind && Date.now() < playUntil ? Math.ceil((playUntil - Date.now()) / 1000) : 0; }
+function heart(hx, hy) {
+  R(hx, hy, 2, 1, '#ff6f91'); R(hx + 3, hy, 2, 1, '#ff6f91'); R(hx, hy + 1, 5, 1, '#ff6f91'); R(hx + 1, hy + 2, 3, 1, '#ff6f91'); R(hx + 2, hy + 3, 1, 1, '#ff6f91');
+}
+function drawPlay(kind, t) {
+  if (kind === 'yarn') {           // a ball of yarn rolls back and forth across the kitchen floor
+    const bx = 90 + 17 * Math.sin(t * 1.1), dir = Math.cos(t * 1.1) >= 0 ? 1 : -1; // cat stays between x 57 and 123
+    for (let k = 1; k < 6; k++) L(Math.round(bx - dir * k * 2), 89, 1, 1, '#f28fb0');
+    L(Math.round(bx) - 1, 86, 3, 3, '#e8584a'); L(Math.round(bx), 86, 1, 1, '#f28fb0'); L(Math.round(bx) - 1, 87, 1, 1, '#c0402a');
+    return drawCat(dir > 0 ? bx - 16 : bx + 2, 90, dir, 'walk', Math.floor(t * 7) % 2, 1);
+  }
+  if (kind === 'wand') {           // a feather on a string swings from the ceiling; the cat leaps for it
+    const AX = 74; // anchor on the ceiling, a little to the right of the food bowls
+    const fx = Math.round(AX + 6 * Math.sin(t * 2.3)), fy = Math.round(68 + 4 * Math.sin(t * 3.1));
+    L(AX - 1, 50, 3, 1, '#5a3a26');
+    for (let k = 0; k <= 12; k++) L(Math.round(AX + (fx - AX) * k / 12), Math.round(51 + (fy - 51) * k / 12), 1, 1, '#7a5236');
+    L(fx - 1, fy, 3, 2, '#c9a0f0'); L(fx, fy + 2, 1, 2, '#f28fb0'); L(fx - 2, fy + 1, 1, 1, '#c9a0f0');
+    const ph = (t * 0.9) % 1, up = ph < 0.3 ? Math.round(Math.sin(ph / 0.3 * Math.PI) * 8) : 0;
+    return drawCat(fx - 9, 90 - up, 1, up ? 'walk' : 'sit', 0, 1);
+  }
+  if (kind === 'box') {            // a cardboard box on the bedroom rug; the cat ducks in and peeks out
+    const peek = Math.sin(t * 1.4) > -0.2;
+    g.save(); g.beginPath(); g.rect(HX + 40, HY + 2, 40, 39); g.clip(); // only above the bedroom floor (y < 41)
+    const pos = drawCat(51, peek ? 40 : 46, 1, 'sit', 0, 1);
+    g.restore();
+    L(48, 32, 19, 9, '#c8955a'); L(48, 32, 19, 1, '#a8743a'); L(48, 40, 19, 1, '#a8743a');   // box, bottom on the floor line
+    L(46, 30, 4, 2, '#d8a76a'); L(65, 30, 4, 2, '#d8a76a'); L(55, 35, 5, 2, '#a8743a');
+    return pos;
+  }
+  // bubbles drift up in the kitchen; the cat bats at them
+  for (let i = 0; i < 6; i++) {
+    const p = (t * 0.22 + i / 6) % 1, x = Math.round(72 + i * 7 + Math.sin(p * 6 + i) * 3), y = Math.round(88 - p * 34);
+    g.globalAlpha = 1 - p * 0.6;
+    L(x, y - 1, 2, 1, '#bfe6ff'); L(x - 1, y, 1, 2, '#bfe6ff'); L(x + 2, y, 1, 2, '#bfe6ff'); L(x, y + 2, 2, 1, '#bfe6ff'); L(x, y, 1, 1, '#ffffff');
+  }
+  g.globalAlpha = 1;
+  return drawCat(86, 90, 1, Math.floor(t * 3) % 2 ? 'groom' : 'sit', Math.floor(t * 3) % 2, 1);
+}
 // ---- 当天任务清空的奖励：bot 的"去看看"链接会带上 ?clear=今天日期 ----
 const CLEAR_PARAM = (() => { try { return new URLSearchParams(location.search).get('clear'); } catch (e) { return null; } })();
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -535,7 +644,7 @@ function isParty(d) {
 function drawDecor(kind, t) {
   if (kind === 0) { // bunting across both upstairs rooms
     const COLS = ['#e8584a', '#f2c46d', '#6f9fd8', '#9bbb59', '#c9a0f0'];
-    for (const [x0, x1] of [[4, 81], [87, 165]]) {
+    for (const [x0, x1] of [[4, 87], [93, 177]]) {
       for (let x = x0; x < x1; x++) { const sag = Math.round(2 * Math.sin(Math.PI * (x - x0) / (x1 - x0))); L(x, 4 + sag, 1, 1, '#7a5236'); }
       for (let x = x0 + 2, i = 0; x < x1 - 4; x += 7, i++) {
         const sag = Math.round(2 * Math.sin(Math.PI * (x + 2 - x0) / (x1 - x0))), c = COLS[i % COLS.length];
@@ -543,10 +652,10 @@ function drawDecor(kind, t) {
       }
     }
   } else if (kind === 1) { // sunflowers in a vase on the dining table
-    L(83, 71, 5, 5, '#6f9fd8'); L(83, 71, 5, 1, '#8fb7e6'); 
-    L(84, 63, 1, 8, '#4f9a4a'); L(86, 65, 1, 6, '#4f9a4a'); L(82, 67, 2, 1, '#4f9a4a');
-    L(82, 60, 5, 4, '#f7c531'); L(83, 59, 3, 6, '#f7c531'); L(83, 61, 3, 2, '#7a4a20');
-    L(86, 63, 4, 3, '#f7c531'); L(87, 62, 2, 5, '#f7c531'); L(87, 63, 2, 2, '#7a4a20');
+    L(86, 71, 5, 5, '#6f9fd8'); L(86, 71, 5, 1, '#8fb7e6'); 
+    L(87, 63, 1, 8, '#4f9a4a'); L(89, 65, 1, 6, '#4f9a4a'); L(85, 67, 2, 1, '#4f9a4a');
+    L(85, 60, 5, 4, '#f7c531'); L(86, 59, 3, 6, '#f7c531'); L(86, 61, 3, 2, '#7a4a20');
+    L(89, 63, 4, 3, '#f7c531'); L(90, 62, 2, 5, '#f7c531'); L(90, 63, 2, 2, '#7a4a20');
   } else { // balloons tied to the left dining chair, bobbing gently
     const bob = reduced ? 0 : Math.round(Math.sin(t * 1.5));
     [[66, 55, '#e8584a'], [71, 52, '#6f9fd8'], [76, 56, '#f2c46d']].forEach(([x, y, c], i) => {
@@ -588,33 +697,37 @@ function frame(ts) {
   const dt = Math.min(0.1, (ts - last) / 1000); last = ts;
   const t = ts / 1000, m = preview ?? nowMinutes();
   const d = new Date(), seed = d.getFullYear() * 400 + d.getMonth() * 32 + d.getDate();
+  const sea = seasonOf(d.getMonth());
+  if (sea !== SEASON) { SEASON = sea; P = PAL[SEASON]; DLF = dlfFor(SEASON); [SKYT, SKYB] = skyFor(SEASON); }
   dl = kf(DLF, m); night = 1 - dl; NK = night * 0.62;
   skyTop = kf(SKYT, m); skyBot = kf(SKYB, m);
 
   todayMeals = mealsFor(seed);
   const st = catState(m, seed);
-  moveCat(st.spot, dt, jump); jump = false;
-  const lightsOn = night > 0.15 && m >= 1020 && m < SLEEP;
+  const playing = playLeft() > 0;
+  if (playing) jump = true; else { moveCat(st.spot, dt, jump); jump = false; }
+  const lightsOn = night > 0.15 && m >= WAKE && m < SLEEP; // lights on whenever it's dark and the cat is up
   const bedLamp = lightsOn;
 
   drawSky(m, t); drawLand(m, t); drawRoof(t);
-  L(0, 0, 168, 96, '#5c3d29'); L(0, 0, 168, 1, '#7a5236');
+  L(0, 0, 180, 96, '#5c3d29'); L(0, 0, 180, 1, '#7a5236');
   bedroom(m, bedLamp); study(m, lightsOn); kitchen(m, lightsOn, !!st.food); bathroom();
   const party = isParty(d), decor = seed % 3;
   if (party) drawDecor(decor, t);
 
-  const pose = cat.walking ? 'walk' : st.pose;
-  const rate = { walk: 5, eat: 3, groom: 2, sleep: 0.7, sit: 0 }[pose];
+  const pose = playing ? 'play' : (cat.walking ? 'walk' : st.pose);
+  const rate = { walk: 5, eat: 3, groom: 2, sleep: 0.7, sit: 0, play: 0 }[pose];
   const f = rate ? Math.floor(t * rate) % 2 : 0;
-  const [csx, csy] = drawCat(cat.x, cat.y, cat.dir, pose, f, cat.alpha);
+  const [csx, csy] = playing ? drawPlay(playKind, t) : drawCat(cat.x, cat.y, cat.dir, pose, f, cat.alpha);
+  if (playing && !reduced) { const p = (t * 0.5) % 1; if (p < 0.6) { g.globalAlpha = 1 - p / 0.6; heart(csx + 5, csy - 2 - Math.round(p * 12)); g.globalAlpha = 1; } }
 
   // night: dim each room, then lamp glow
   if (night > 0.02) {
-    const rooms = [[2, 2, 80, 44, bedLamp], [85, 2, 81, 44, lightsOn], [2, 50, 112, 44, lightsOn], [117, 50, 49, 44, lightsOn]];
+    const rooms = [[2, 2, 86, 44, bedLamp], [91, 2, 87, 44, lightsOn], [2, 50, 124, 44, lightsOn], [129, 50, 49, 44, lightsOn]];
     for (const [x, y, w, h, on] of rooms) { g.globalAlpha = night * (on ? 0.16 : 0.55); L(x, y, w, h, '#141a44'); }
     g.globalAlpha = 1;
     if (lightsOn) {
-      const glows = [[39, 29, bedLamp], [159, 24, true], [93, 62, true], [138, 54, true]];
+      const glows = [[39, 29, bedLamp], [165, 24, true], [98, 62, true], [150, 54, true]];
       for (const [x, y, on] of glows) if (on) for (let r = 3; r >= 1; r--) { g.globalAlpha = 0.07 * night; L(x - r * 5, y - r * 3, r * 10, r * 6, '#ffd27a'); }
       g.globalAlpha = 1;
     }
@@ -639,7 +752,8 @@ function frame(ts) {
   clockEl.textContent = hhmm(m);
   const ds = fmtDate(d);
   if (ds !== lastDate) { dateEl.textContent = ds; lastDate = ds; }
-  const txt = cat.walking ? T('walking') : T('cat') + st.txt;
+  const txt = playing ? T('cat') + T('playing')[playKind] + T('left')(playLeft())
+    : (cat.walking ? T('walking') : T('cat') + st.txt);
   if (txt !== lastTxt) { statusEl.textContent = txt; lastTxt = txt; }
   if (st.k !== lastK) { document.querySelectorAll('#sched li').forEach(li => li.classList.toggle('now', li.dataset.k === st.k)); lastK = st.k; }
   requestAnimationFrame(frame);
