@@ -605,36 +605,50 @@ function playLeft() { return playKind && Date.now() < playUntil ? Math.ceil((pla
 function heart(hx, hy) {
   R(hx, hy, 2, 1, '#ff6f91'); R(hx + 3, hy, 2, 1, '#ff6f91'); R(hx, hy + 1, 5, 1, '#ff6f91'); R(hx + 1, hy + 2, 3, 1, '#ff6f91'); R(hx + 2, hy + 3, 1, 1, '#ff6f91');
 }
-// ---- takeaway on the dining table (table top at y = 76, food sits on the right half, x ≈ 96–110) ----
+// ---- takeaway on the dining table (table top at y = 76) ----
+// The food is eaten in bites from the side nearest the cat; after each bite the cat shuffles forward.
+// Returns the x of the nearest remaining bite and whether the cat is mid-shuffle.
 function drawFood(food, ate, t) {
-  const left = 1 - ate;
+  const bites = (n, base, step) => {        // n bites, the k-th sits at base + k*step
+    const p = Math.min(n, ate * n), k = Math.floor(p), frac = p - k;
+    const s = k === 0 ? 1 : Math.min(1, frac / 0.1);        // shuffle forward over the first 10% after a bite
+    const sm = s * s * (3 - 2 * s);
+    return { k, front: base + step * (k === 0 ? 0 : k - 1 + sm), moving: k > 0 && k < n && frac < 0.1 };
+  };
+  let b;
   if (food === 'sushi') {
-    L(95, 74, 15, 2, '#a8743a'); L(95, 74, 15, 1, '#c99260');                      // wooden board
-    const n = Math.ceil(left * 4);
-    for (let i = 0; i < n; i++) { const x = 106 - i * 4; L(x, 72, 3, 2, '#fdfaf2'); L(x, 71, 3, 1, '#f28a5a'); L(x + 1, 71, 1, 1, '#f8b08a'); }
+    b = bites(4, 95, 4);
+    L(94, 74, 16, 2, '#a8743a'); L(94, 74, 16, 1, '#c99260');                       // wooden board
+    for (let i = b.k; i < 4; i++) { const x = 95 + i * 4; L(x, 72, 3, 2, '#fdfaf2'); L(x, 71, 3, 1, '#f28a5a'); L(x + 1, 71, 1, 1, '#f8b08a'); }
   } else if (food === 'fishchips') {
-    L(95, 73, 15, 3, '#f4efe6'); L(96, 74, 13, 1, '#c9c2b4'); L(98, 75, 9, 1, '#c9c2b4');      // newspaper wrap
-    for (let i = 0; i < 6; i++) L(97 + i * 2, 71 + (i % 2), 1, 2, '#f2d06a');                     // chips
-    if (left > 0.15) { const w = Math.max(2, Math.round(8 * left)); L(100, 71, w, 2, '#d99a3a'); L(100, 71, w, 1, '#e8b25a'); } // battered fish shrinking
+    b = bites(6, 96, 2);
+    L(94, 73, 16, 3, '#f4efe6'); L(95, 74, 14, 1, '#c9c2b4'); L(97, 75, 10, 1, '#c9c2b4');     // newspaper wrap
+    for (let i = b.k; i < 3; i++) L(96 + i * 2, 71 + (i % 2), 1, 2, '#f2d06a');                // chips first…
+    const fx = Math.max(100, 96 + b.k * 2);
+    if (fx < 108) { L(fx, 71, 108 - fx, 2, '#d99a3a'); L(fx, 71, 108 - fx, 1, '#e8b25a'); }    // …then the fish, bite by bite
   } else if (food === 'chicken') {
-    L(99, 69, 8, 7, '#ffffff'); for (let x = 99; x < 107; x += 2) L(x, 69, 1, 7, '#d9534f');    // striped bucket
-    L(98, 68, 10, 1, '#c0402a');
-    const n = Math.ceil(left * 3);
-    for (let i = 0; i < n; i++) { const x = 100 + i * 3; L(x, 66, 2, 2, '#b8702a'); L(x + 1, 65, 1, 1, '#f4efe6'); } // drumsticks
+    b = bites(3, 97, 3); b = { k: b.k, front: 97, moving: false };      // the bucket doesn't budge, so the cat stays put and reaches in
+    L(98, 69, 9, 7, '#ffffff'); for (let x = 98; x < 107; x += 2) L(x, 69, 1, 7, '#d9534f');   // striped bucket
+    L(97, 68, 11, 1, '#c0402a');
+    for (let i = b.k; i < 3; i++) { const x = 99 + i * 3; L(x, 66, 2, 2, '#b8702a'); L(x + 1, 65, 1, 1, '#f4efe6'); } // drumsticks, nearest first
   } else if (food === 'pizza') {
-    L(96, 64, 14, 10, '#e8d0a0'); L(96, 64, 14, 1, '#cdb486'); L(97, 66, 12, 1, '#c0402a');      // open lid behind
-    L(95, 74, 16, 2, '#d8b98a');                                                                  // box
-    const w = Math.max(0, Math.round(12 * left));
-    if (w) { L(97, 72, w, 2, '#e8a64a'); for (let x = 98; x < 97 + w; x += 3) L(x, 72, 1, 1, '#c0402a'); L(97, 73, w, 1, '#f2d06a'); }
-  } else {                                                                                      // ramen
-    L(97, 71, 11, 1, '#f4efe6'); L(98, 72, 9, 3, '#f4efe6'); L(99, 75, 7, 1, '#e3ddd2');        // bowl
+    b = bites(6, 96, 2);
+    L(96, 64, 14, 10, '#e8d0a0'); L(96, 64, 14, 1, '#cdb486'); L(97, 66, 12, 1, '#c0402a');    // open lid behind
+    L(94, 74, 16, 2, '#d8b98a');                                                                // box
+    const px = 96 + b.k * 2, w = 108 - px;
+    if (w > 0) { L(px, 72, w, 2, '#e8a64a'); for (let x = px + 1; x < 108; x += 3) L(x, 72, 1, 1, '#c0402a'); L(px, 73, w, 1, '#f2d06a'); }
+  } else {                                                                                       // ramen: bowl stays put
+    b = { front: 96, moving: false };
+    const left = 1 - ate;
+    L(96, 71, 11, 1, '#f4efe6'); L(97, 72, 9, 3, '#f4efe6'); L(98, 75, 7, 1, '#e3ddd2');
     const lvl = Math.round(left * 2);
-    if (lvl > 0) { L(98, 71, 9, 1, '#e8b04a'); L(100, 71, 2, 1, '#f2d06a'); }
-    if (lvl > 1) { L(103, 70, 2, 1, '#f4c06a'); L(99, 70, 1, 1, '#4f9a4a'); }                  // egg + spring onion
-    for (let k = 0; k < 6; k++) L(105 + k, 70 - k, 1, 1, '#8a5a36');                            // chopsticks
-    if (!reduced && left > 0.2) for (let i = 0; i < 2; i++) { const p = (t * 0.5 + i / 2) % 1; g.globalAlpha = (1 - p) * 0.5; L(100 + i * 3 + Math.sin(p * 6) * 1.5, 68 - p * 8, 1, 2, '#ffffff'); }
+    if (lvl > 0) { L(97, 71, 9, 1, '#e8b04a'); L(99, 71, 2, 1, '#f2d06a'); }
+    if (lvl > 1) { L(102, 70, 2, 1, '#f4c06a'); L(98, 70, 1, 1, '#4f9a4a'); }
+    for (let k = 0; k < 6; k++) L(104 + k, 70 - k, 1, 1, '#8a5a36');
+    if (!reduced && left > 0.2) for (let i = 0; i < 2; i++) { const p = (t * 0.5 + i / 2) % 1; g.globalAlpha = (1 - p) * 0.5; L(99 + i * 3 + Math.sin(p * 6) * 1.5, 68 - p * 8, 1, 2, '#ffffff'); }
     g.globalAlpha = 1;
   }
+  return b;
 }
 
 // ---- fireworks (night only; the bot picks it only after dark) ----
@@ -776,16 +790,16 @@ function drawPlay(kind, t) {
     }
     return drawCat(x, 113 - up, dir, pose, wiggle, 1);
   }
-  if (kind === 'steal') {          // hop onto a chair, then the dining table, and eat the takeaway bit by bit
+  if (kind === 'steal') {          // hop onto a chair, then the dining table, and eat the takeaway bite by bite
     const pe = playElapsed(), ate = Math.max(0, Math.min(1, (pe - 3.5) / 52));   // 0 → 1 over the minute
-    drawFood(playFood, ate, t);
+    const f = drawFood(playFood, ate, t), eatX = Math.round(f.front - 12);         // mouth (x+12) right at the nearest bite
     if (pe < 1.2) return drawCat(58 + (66 - 58) * (pe / 1.2), 90, 1, 'walk', Math.floor(t * 7) % 2, 1);             // trot to the chair
     if (pe < 2.0) { const k = (pe - 1.2) / 0.8; return drawCat(66 + 6 * k, 90 - 10 * k - Math.sin(k * Math.PI) * 6, 1, 'walk', 0, 1); } // up onto the seat
-    if (pe < 3.0) { const k = (pe - 2.0) / 1.0; return drawCat(72 + 12 * k, 80 - 4 * k - Math.sin(k * Math.PI) * 8, 1, 'walk', 0, 1); } // up onto the table
-    const look = (pe % 11) > 9.3;                                                  // every so often: freeze and glance around
-    const pos = drawCat(84, 76, 1, look ? 'sit' : 'eat', Math.floor(t * 3) % 2, 1);
-    for (let i = 0; i < Math.floor(ate * 6); i++) L(92 + ((i * 7) % 18), 75 - (i % 2), 1, 1, '#d9a35a');            // crumbs on the table
-    if (look) { L(pos[0] - HX + 6, -2 + pos[1] - HY, 1, 3, '#ffffff'); L(pos[0] - HX + 6, 2 + pos[1] - HY, 1, 1, '#ffffff'); } // "!" above its head
+    if (pe < 3.0) { const k = (pe - 2.0) / 1.0; return drawCat(72 + (eatX - 72) * k, 80 - 4 * k - Math.sin(k * Math.PI) * 8, 1, 'walk', 0, 1); } // up onto the table
+    const look = !f.moving && (pe % 11) > 9.3;                                     // every so often: freeze and glance around
+    const pos = drawCat(eatX, 76, 1, f.moving ? 'walk' : (look ? 'sit' : 'eat'), Math.floor(t * (f.moving ? 8 : 3)) % 2, 1);
+    for (let i = 0; i < Math.floor(ate * 6); i++) L(eatX + 9 - ((i * 5) % 12), 75 - (i % 2), 1, 1, '#d9a35a');     // crumbs behind it
+    if (look) { L(pos[0] - HX + 6, -2 + pos[1] - HY, 1, 3, '#ffffff'); L(pos[0] - HX + 6, 2 + pos[1] - HY, 1, 1, '#ffffff'); } // "!"
     return pos;
   }
   if (kind === 'fireworks') return drawCat(119, 25, 1, 'sit', 0, 1);   // sitting on the study windowsill
