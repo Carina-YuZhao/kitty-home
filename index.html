@@ -444,6 +444,12 @@ function sprite(pose, f) {
   } else if (pose === 'eat') {
     tailUp(); standBody(); [2, 7].forEach(l => { p(l, 9, 1, 1, CB); p(l, 10, 1, 1, CL); });
     head(7, 5 + f);
+  } else if (pose === 'reach') {          // up on its hind legs, front paws hooked over a rim
+    p(0, 8, 2, 1, CB); p(0, 7, 1, 1, CB); p(0, 6, 1, 1, CD);               // tail
+    p(1, 6, 5, 4, CB); p(2, 7, 1, 1, CD); p(1, 10, 1, 1, CL); p(4, 10, 2, 1, CL); // haunch + hind feet
+    p(3, 4, 4, 3, CB); p(6, 5, 1, 3, CL);                                  // torso, belly
+    p(7, 4, 4, 1, CB); p(7, 5, 2, 1, CB); p(11, 4, 1, 1, CL);              // front legs + paw over the rim
+    head(5, f);                                                            // dips in and out
   } else if (pose === 'groom') {
     sit();
     if (f) { head(7, 2, 'closed'); p(9, 6, 2, 1, CL); } else { head(7, 1, 'closed'); p(9, 4, 2, 2, CL); }
@@ -481,7 +487,7 @@ const I18N = {
         playing: { yarn: '在追毛线球！', wand: '在扑逗猫棒上的羽毛！', box: '钻进了纸箱，只露出一个脑袋', bubble: '在拍泡泡', fireworks: '坐在书房窗台上看烟花 🎆',
           tree: '爬到了外面的树上，坐在树梢吹风 ✨', roof: '跑上了屋顶，舔舔毛、打个盹 ✨',
           butterfly: '在草地上追蝴蝶 ✨', pounce: sea => sea === 'winter' ? '在雪地里扑雪堆 ✨' : '在草丛里扑小虫子 ✨',
-          steal: () => `跳上餐桌，在偷吃你的${({ sushi: '三文鱼寿司', fishchips: '炸鱼薯条', chicken: '炸鸡', pizza: '披萨', ramen: '拉面' })[playFood]}外卖！😼` },
+          steal: () => playElapsed() >= 48 ? '偷吃完了，跳回椅子上若无其事地舔毛 😼' : `跳上餐桌，在偷吃你的${({ sushi: '三文鱼寿司', fishchips: '炸鱼薯条', chicken: '炸鸡', pizza: '披萨', ramen: '拉面' })[playFood]}外卖！😼` },
         left: s => `（还剩 ${s} 秒）`,
         party: ['🎉 今天的任务全部完成！小屋挂上了彩旗', '🎉 今天的任务全部完成！餐桌上多了一束向日葵', '🎉 今天的任务全部完成！椅子上绑了一串气球'],
         grooming: '在舔毛，认真打理自己', toilet: '上厕所', toiletWhen: '每天 4 次',
@@ -493,7 +499,7 @@ const I18N = {
         playing: { yarn: 'is chasing a ball of yarn!', wand: 'is pouncing on the feather wand!', box: 'has squeezed into a box, only its head poking out', bubble: 'is batting at bubbles', fireworks: 'is on the study windowsill watching fireworks 🎆',
           tree: 'has climbed the tree outside and is enjoying the breeze ✨', roof: 'is up on the roof, grooming and dozing ✨',
           butterfly: 'is chasing a butterfly across the lawn ✨', pounce: sea => sea === 'winter' ? 'is pouncing on snow piles ✨' : 'is pouncing on bugs in the grass ✨',
-          steal: () => `has jumped on the table and is stealing your ${({ sushi: 'salmon sushi', fishchips: 'fish and chips', chicken: 'fried chicken', pizza: 'pizza', ramen: 'ramen' })[playFood]} takeaway! 😼` },
+          steal: () => playElapsed() >= 48 ? 'has polished it all off and is innocently washing on the chair 😼' : `has jumped on the table and is stealing your ${({ sushi: 'salmon sushi', fishchips: 'fish and chips', chicken: 'fried chicken', pizza: 'pizza', ramen: 'ramen' })[playFood]} takeaway! 😼` },
         left: s => ` (${s}s left)`,
         party: ["🎉 All of today's tasks done! Bunting is up in the cottage", "🎉 All of today's tasks done! Sunflowers on the dining table", "🎉 All of today's tasks done! Balloons tied to a chair"],
         wait: n => `is waiting by the bowl for ${n.toLowerCase()}`, grooming: 'is grooming, very thoroughly',
@@ -790,14 +796,21 @@ function drawPlay(kind, t) {
     }
     return drawCat(x, 113 - up, dir, pose, wiggle, 1);
   }
-  if (kind === 'steal') {          // hop onto a chair, then the dining table, and eat the takeaway bite by bite
-    const pe = playElapsed(), ate = Math.max(0, Math.min(1, (pe - 3.5) / 52));   // 0 → 1 over the minute
-    const f = drawFood(playFood, ate, t), eatX = Math.round(f.front - 12);         // mouth (x+12) right at the nearest bite
+  if (kind === 'steal') {          // hop onto a chair, then the table, eat the takeaway bite by bite, then hop back to the chair to wash
+    const pe = playElapsed(), ate = Math.max(0, Math.min(1, (pe - 3.5) / 44));   // all gone by 47.5 s
+    const f = drawFood(playFood, ate, t), bucket = playFood === 'chicken';
+    const eatX = bucket ? 88 : Math.round(f.front - 12);                           // mouth right at the nearest bite (paws on the bucket rim for chicken)
+    const SEATX = 68;
     if (pe < 1.2) return drawCat(58 + (66 - 58) * (pe / 1.2), 90, 1, 'walk', Math.floor(t * 7) % 2, 1);             // trot to the chair
     if (pe < 2.0) { const k = (pe - 1.2) / 0.8; return drawCat(66 + 6 * k, 90 - 10 * k - Math.sin(k * Math.PI) * 6, 1, 'walk', 0, 1); } // up onto the seat
     if (pe < 3.0) { const k = (pe - 2.0) / 1.0; return drawCat(72 + (eatX - 72) * k, 80 - 4 * k - Math.sin(k * Math.PI) * 8, 1, 'walk', 0, 1); } // up onto the table
+    if (pe >= 50) return drawCat(SEATX, 80, 1, (t % 7) < 6 ? 'groom' : 'sit', Math.floor(t * 2) % 2, 1);           // last 10 s: full, washing on the chair
+    if (pe >= 48.3) { const k = (pe - 48.3) / 1.2, kk = Math.min(1, k);                                                // hop back down to the seat
+      return drawCat(eatX + (SEATX - eatX) * kk, 76 + 4 * kk - Math.sin(kk * Math.PI) * 7, -1, 'walk', 0, 1); }
+    if (pe >= 47.5) return drawCat(eatX, 76, -1, 'sit', 0, 1);                                                        // licks lips, turns round
     const look = !f.moving && (pe % 11) > 9.3;                                     // every so often: freeze and glance around
-    const pos = drawCat(eatX, 76, 1, f.moving ? 'walk' : (look ? 'sit' : 'eat'), Math.floor(t * (f.moving ? 8 : 3)) % 2, 1);
+    const pose = f.moving ? 'walk' : look ? 'sit' : bucket ? 'reach' : 'eat';
+    const pos = drawCat(eatX, 76, 1, pose, Math.floor(t * (f.moving ? 8 : 3)) % 2, 1);
     for (let i = 0; i < Math.floor(ate * 6); i++) L(eatX + 9 - ((i * 5) % 12), 75 - (i % 2), 1, 1, '#d9a35a');     // crumbs behind it
     if (look) { L(pos[0] - HX + 6, -2 + pos[1] - HY, 1, 3, '#ffffff'); L(pos[0] - HX + 6, 2 + pos[1] - HY, 1, 1, '#ffffff'); } // "!"
     return pos;
