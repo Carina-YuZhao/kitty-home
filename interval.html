@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>画一个范围</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg:#33261b; --wood:#6b4a32; --wood-dark:#4a3222; --paper:#f3e3c3; --paper-hi:#fbefd6;
+  --ink:#4a3322; --muted:#8a6d52; --accent:#d9773a;
+  --pix:"DotGothic16","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--paper);font-family:var(--pix);-webkit-user-select:none;user-select:none}
+main{max-width:640px;margin:0 auto;padding:16px}
+.panel{background:var(--paper);color:var(--ink);border:3px solid var(--wood-dark);box-shadow:0 3px 0 #22170f;padding:14px;border-radius:3px}
+h1{font-size:19px;font-weight:400;margin:0 0 6px;line-height:1.5}
+.hint{font-size:14px;color:var(--muted);margin:0 0 12px}
+.pad{position:relative;background:var(--paper-hi);border:2px solid var(--wood-dark);touch-action:none}
+canvas{display:block;width:100%;height:230px;touch-action:none}
+.answer{font-size:24px;color:var(--accent);text-align:center;margin:12px 0 4px;min-height:34px;font-variant-numeric:tabular-nums}
+.row{display:flex;gap:10px;margin-top:12px}
+button{flex:1;font-family:var(--pix);font-size:16px;padding:10px 12px;border:2px solid var(--wood-dark);box-shadow:0 2px 0 var(--wood-dark);cursor:pointer;background:var(--paper-hi);color:var(--ink)}
+button.go{background:var(--accent);color:#fff8ec}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible{outline:3px solid #ffd27a;outline-offset:2px}
+.tg .row .go{display:none}            /* inside Telegram the native bottom button does the sending */
+</style>
+</head>
+<body>
+<main>
+  <div class="panel">
+    <h1 id="q">你说"下午"的时候，一般指几点到几点？</h1>
+    <p class="hint" id="hint">用手指在线上画一个圈，圈住你觉得的范围；圈和线的两个交点就是答案。不满意就再画一次。</p>
+    <div class="pad"><canvas id="c" aria-label="画范围的区域"></canvas></div>
+    <div class="answer" id="ans" aria-live="polite"></div>
+    <div class="row">
+      <button id="skip" type="button">跳过</button>
+      <button id="clear" type="button">重画</button>
+      <button id="send" class="go" type="button" disabled>就是这样</button>
+    </div>
+  </div>
+</main>
+<script>
+// ---- what to ask (all from the link the bot sent) ----
+// k: question key · kind: time (clock times, axis in hours) | dur (minutes) · q: question · lo/hi: axis range
+const P = new URLSearchParams(location.search);
+const KIND = P.get('kind') === 'dur' ? 'dur' : 'time';
+const KEY = P.get('k') || 'test';
+const LO = +(P.get('lo') || (KIND === 'time' ? 6 : 0));
+const HI = +(P.get('hi') || (KIND === 'time' ? 24 : 120));
+if (P.get('q')) document.getElementById('q').textContent = P.get('q');
+
+const tg = window.Telegram && Telegram.WebApp && Telegram.WebApp.initData !== undefined && Telegram.WebApp.platform !== 'unknown' ? Telegram.WebApp : null;
+if (tg) {
+  document.body.classList.add('tg');
+  tg.ready(); tg.expand();
+  try { tg.disableVerticalSwipes(); } catch (e) {}           // otherwise dragging down closes the page
+  tg.MainButton.setParams({ text: '就是这样', color: '#d9773a', text_color: '#fff8ec' });
+  tg.MainButton.onClick(send);
+}
+
+// ---- axis: value <-> x ----
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+const PADX = 18, AXIS_Y = () => Math.round(H / 2);
+const toX = v => PADX + (v - LO) / (HI - LO) * (W - 2 * PADX);
+const toV = x => LO + (x - PADX) / (W - 2 * PADX) * (HI - LO);
+const STEP = KIND === 'time' ? 0.25 : (HI - LO > 180 ? 15 : 5);    // snap: 15 min for clock times, 5/15 min for durations
+const snap = v => Math.min(HI, Math.max(LO, Math.round(v / STEP) * STEP));
+const fmt = v => {
+  if (KIND === 'time') { const h = Math.floor(v + 1e-9), m = Math.round((v - h) * 60); if (h === 24 && m === 0) return '24:00'; return (h >= 24 ? '次日 ' : '') + `${h % 24}:${String(m).padStart(2, '0')}`; }  // 25 = 1am
+  if (v < 60) return `${v} 分钟`;
+  const h = Math.floor(v / 60), m = v % 60; return m ? `${h} 小时 ${m} 分` : `${h} 小时`;
+};
+
+let stroke = [], drawing = false, result = null;
+
+function resize() {
+  DPR = window.devicePixelRatio || 1;
+  const r = cv.getBoundingClientRect(); W = r.width; H = r.height;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  draw();
+}
+
+function ticks() {
+  const out = [];
+  if (KIND === 'time') { const s = (HI - LO) > 12 ? 2 : 1; for (let v = Math.ceil(LO / s) * s; v <= HI; v += s) out.push(v); }
+  else { const span = HI - LO, s = span > 240 ? 60 : span > 90 ? 30 : 15; for (let v = Math.ceil(LO / s) * s; v <= HI; v += s) out.push(v); }
+  return out;
+}
+
+function draw() {
+  g.clearRect(0, 0, W, H);
+  const ay = AXIS_Y();
+  // axis (the line you draw across)
+  g.strokeStyle = '#4a3322'; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(PADX, ay); g.lineTo(W - PADX, ay); g.stroke();
+  g.lineWidth = 2; g.fillStyle = '#8a6d52'; g.font = '13px DotGothic16, sans-serif'; g.textAlign = 'center';
+  for (const v of ticks()) {
+    const x = Math.round(toX(v)) + .5;
+    g.beginPath(); g.moveTo(x, ay - 5); g.lineTo(x, ay + 5); g.stroke();
+    g.fillText(KIND === 'time' ? String(v % 24) : (v < 60 ? String(v) : `${Math.floor(v / 60)}h` + (v % 60 ? String(v % 60) : '')), x, ay + 20);
+  }
+  if (KIND === 'dur') { g.textAlign = 'right'; g.fillText('分钟', W - 2, 14); }
+  // the loop exactly as drawn (closed once the finger lifts)
+  const pts = drawing ? stroke : (result ? result.path : []);
+  if (pts.length > 1) {
+    g.strokeStyle = drawing ? '#4a3322' : '#d9773a'; g.lineWidth = 3; g.lineJoin = g.lineCap = 'round';
+    g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+    for (const [x, y] of pts) g.lineTo(x, y);
+    if (!drawing) g.closePath();
+    g.stroke();
+  }
+  // the answer: the stretch of axis between the two crossings, with markers
+  if (result && !drawing) {
+    const x0 = toX(result.lo), x1 = toX(result.hi);
+    g.strokeStyle = '#d9773a'; g.lineWidth = 6;
+    g.beginPath(); g.moveTo(x0, ay); g.lineTo(x1, ay); g.stroke();
+    g.lineWidth = 3; g.lineCap = 'butt';
+    for (const x of [x0, x1]) { g.beginPath(); g.moveTo(x, ay - 13); g.lineTo(x, ay + 13); g.stroke(); }   // markers centred on the axis
+  }
+}
+
+function pt(e) { const r = cv.getBoundingClientRect(); return [Math.min(W, Math.max(0, e.clientX - r.left)), Math.min(H, Math.max(0, e.clientY - r.top))]; }
+cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.setPointerCapture(e.pointerId); drawing = true; stroke = [pt(e)]; draw(); });
+cv.addEventListener('pointermove', e => { if (!drawing) return; e.preventDefault(); stroke.push(pt(e)); draw(); });
+// where the closed loop crosses the axis line (straight segments between finger samples)
+function crossings(path, y) {
+  const hits = [], n = path.length;
+  for (let i = 0; i < n; i++) {
+    const [xa, ya] = path[i], [xb, yb] = path[(i + 1) % n];      // the last segment closes the loop
+    if (ya === yb) { if (ya === y) hits.push(xa, xb); continue; }
+    if ((ya - y) * (yb - y) <= 0) hits.push(xa + (y - ya) / (yb - ya) * (xb - xa));
+  }
+  return hits;
+}
+const say = t => { document.getElementById('ans').textContent = t; };
+const finish = e => {
+  if (!drawing) return;
+  drawing = false;
+  const path = stroke;
+  const hits = path.length > 2 ? crossings(path, AXIS_Y()) : [];
+  const left = PADX, right = W - PADX;
+  if (!hits.length || hits.every(x => x < left) || hits.every(x => x > right)) {   // never crossed the line
+    if (!result) say('要画一个穿过中间那条线的圈哦');
+    draw(); return;
+  }
+  const lo = snap(toV(Math.max(left, Math.min(...hits)))), hi = snap(toV(Math.min(right, Math.max(...hits))));
+  result = { lo, hi, path: path.slice() };
+  say(`${fmt(lo)} – ${fmt(hi)}`);
+  document.getElementById('send').disabled = false;
+  if (tg) tg.MainButton.show();
+  if (tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+  draw();
+};
+cv.addEventListener('pointerup', finish);
+cv.addEventListener('pointercancel', finish);
+
+document.getElementById('clear').onclick = () => {
+  result = null; stroke = []; document.getElementById('ans').textContent = '';
+  document.getElementById('send').disabled = true; if (tg) tg.MainButton.hide(); draw();
+};
+document.getElementById('send').onclick = send;
+document.getElementById('skip').onclick = () => out({ k: KEY, skip: 1 });
+
+function send() { if (result) out({ k: KEY, kind: KIND, lo: result.lo, hi: result.hi }); }
+function out(data) {
+  const s = JSON.stringify(data);
+  if (tg) tg.sendData(s);                       // goes back to the bot as a message; the page closes itself
+  else { window.__sent = s; document.getElementById('ans').textContent = '（预览）会发送：' + s; }
+}
+
+window.addEventListener('resize', resize);
+resize();
+if (document.fonts) document.fonts.ready.then(draw);
+</script>
+</body>
+</html>
