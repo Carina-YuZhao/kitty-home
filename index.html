@@ -494,7 +494,7 @@ const I18N = {
   zh: { title: '猫猫小屋', sub: '初夏 · 晴', routine: '猫猫的作息', breakfast: '早饭', lunch: '午饭', dinner: '晚饭',
         bed: '睡觉', groom: '舔毛', random: '随机', about: '约 ', preview: '时间预览', back: '回到现在', now: '现在',
         cat: '猫猫', walking: '猫猫正在走过去…', sleep: '在床上睡觉，晚安', eat: n => `在吃${n}`, wait: n => `蹲在碗边等${n}`,
-        playing: { yarn: '在追毛线球！', wand: '在扑逗猫棒上的羽毛！', box: '钻进了纸箱，只露出一个脑袋', bubble: '在拍泡泡', fireworks: () => playElapsed() < FW_START ? '趴在书房地上发呆' : playElapsed() < FW_START + 1.9 ? '被第一声烟花吓了一跳！尾巴都炸毛了' : '壮着胆子跳上书房窗台看烟花 🎆',
+        playing: { yarn: '在追毛线球！', wand: '在扑逗猫棒上的羽毛！', box: '钻进了纸箱，只露出一个脑袋', bubble: '在拍泡泡', fireworks: () => seenElapsed() < FW_START ? '趴在书房地上发呆' : seenElapsed() < FW_START + 1.9 ? '被第一声烟花吓了一跳！尾巴都炸毛了' : '壮着胆子跳上书房窗台看烟花 🎆',
           tree: '爬到了外面的树上，坐在树梢吹风 ✨', roof: '跑上了屋顶，舔舔毛、打个盹 ✨',
           butterfly: '在草地上追蝴蝶 ✨', pounce: sea => sea === 'winter' ? '在雪地里扑雪堆 ✨' : '在草丛里扑小虫子 ✨',
           steal: () => playElapsed() >= 48 ? '偷吃完了，跳回椅子上若无其事地舔毛 😼' : `跳上餐桌，在偷吃你的${({ sushi: '三文鱼寿司', fishchips: '炸鱼薯条', chicken: '炸鸡', pizza: '披萨', ramen: '拉面' })[playFood]}外卖！😼` },
@@ -506,7 +506,7 @@ const I18N = {
   en: { title: 'Cat Cottage', sub: 'Early summer · Sunny', routine: "The cat's day", breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
         bed: 'Bedtime', groom: 'Grooming', random: 'Random', about: '~', preview: 'Preview time', back: 'Back to now', now: 'Now',
         cat: 'The cat ', walking: 'The cat is on its way…', sleep: 'is asleep in bed. Good night', eat: n => `is having ${n.toLowerCase()}`,
-        playing: { yarn: 'is chasing a ball of yarn!', wand: 'is pouncing on the feather wand!', box: 'has squeezed into a box, only its head poking out', bubble: 'is batting at bubbles', fireworks: () => playElapsed() < FW_START ? 'is lying on the study floor, daydreaming' : playElapsed() < FW_START + 1.9 ? 'jumped at the first firework bang! Tail all puffed up' : 'has bravely hopped onto the study windowsill to watch the fireworks 🎆',
+        playing: { yarn: 'is chasing a ball of yarn!', wand: 'is pouncing on the feather wand!', box: 'has squeezed into a box, only its head poking out', bubble: 'is batting at bubbles', fireworks: () => seenElapsed() < FW_START ? 'is lying on the study floor, daydreaming' : seenElapsed() < FW_START + 1.9 ? 'jumped at the first firework bang! Tail all puffed up' : 'has bravely hopped onto the study windowsill to watch the fireworks 🎆',
           tree: 'has climbed the tree outside and is enjoying the breeze ✨', roof: 'is up on the roof, grooming and dozing ✨',
           butterfly: 'is chasing a butterfly across the lawn ✨', pounce: sea => sea === 'winter' ? 'is pouncing on snow piles ✨' : 'is pouncing on bugs in the grass ✨',
           steal: () => playElapsed() >= 48 ? 'has polished it all off and is innocently washing on the chair 😼' : `has jumped on the table and is stealing your ${({ sushi: 'salmon sushi', fishchips: 'fish and chips', chicken: 'fried chicken', pizza: 'pizza', ramen: 'ramen' })[playFood]} takeaway! 😼` },
@@ -616,6 +616,10 @@ const FOODS = ['sushi', 'fishchips', 'chicken', 'pizza', 'ramen'];
 let playFood = FOODS.includes(QS.get('food')) ? QS.get('food') : FOODS[Math.floor(Math.random() * FOODS.length)];
 let playUntil = playKind ? (parseInt(QS.get('until'), 10) || 0) * 1000 : 0;
 if (playUntil > Date.now() + 70000) playUntil = Date.now() + 60000;  // clock skew guard: never more than ~1 minute
+// seconds since the page was actually opened during this play (Telegram takes a few seconds to open the page,
+// so intros that must be seen — like the quiet start before the fireworks — count from here, not from the button press)
+const PAGE_OPEN = Date.now();
+function seenElapsed() { return playKind ? Math.max(0, (Date.now() - Math.max(PAGE_OPEN, playUntil - 60000)) / 1000) : 0; }
 function playElapsed() { return playKind ? Math.max(0, 60 - (playUntil - Date.now()) / 1000) : 0; }
 function playLeft() { return playKind && Date.now() < playUntil ? Math.ceil((playUntil - Date.now()) / 1000) : 0; }
 function heart(hx, hy) {
@@ -669,7 +673,7 @@ function drawFood(food, ate, t) {
 
 // ---- fireworks (night only; the bot picks it only after dark) ----
 let fwFlash = null; // [colour, strength] of the freshest burst, tints the window panes
-const FW_START = 3;  // the first few seconds are quiet, so the cat can be startled by the first bang
+const FW_START = 4;  // the first few seconds after the page opens are quiet, so the cat can be startled by the first bang
 function drawFireworks(t) {
   fwFlash = null;
   const COLS = ['#ff6f91', '#ffd27a', '#8fd6ff', '#b8f08a', '#c9a0f0', '#ff9a5a'];
@@ -827,7 +831,7 @@ function drawPlay(kind, t) {
     return pos;
   }
   if (kind === 'fireworks') {  // [sensitive] lying on the study floor → first bang: startled, tail puffed → hops up to the sill to watch
-    const pe = playElapsed(), FX = 113, FY = 42, SX = 119, SY = 25;
+    const pe = seenElapsed(), FX = 113, FY = 42, SX = 119, SY = 25;
     if (pe < FW_START + 0.1) return drawCat(FX, FY, 1, 'loaf', (t % 4) > 3.8 ? 1 : 0, 1);
     if (pe < FW_START + 1.1) {   // startled: a little jump on the spot, then a shiver
       const k = pe - FW_START - 0.1, up = k < 0.3 ? Math.sin(k / 0.3 * Math.PI) * 4 : 0, shake = k >= 0.3 ? (Math.floor(t * 20) % 2) : 0;
@@ -981,7 +985,7 @@ function frame(ts) {
   const bedLamp = lightsOn;
 
   drawSky(m, t);
-  if (playing && playKind === 'fireworks' && playElapsed() >= FW_START) drawFireworks(playElapsed() - FW_START); else fwFlash = null;
+  if (playing && playKind === 'fireworks' && seenElapsed() >= FW_START) drawFireworks(seenElapsed() - FW_START); else fwFlash = null;
   drawLand(m, t); drawRoof(t);
   L(0, 0, 180, 96, '#5c3d29'); L(0, 0, 180, 1, '#7a5236');
   bedroom(m, bedLamp); study(m, lightsOn); kitchen(m, lightsOn, !!st.food); bathroom();
