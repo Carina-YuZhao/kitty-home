@@ -46,10 +46,11 @@ button:focus-visible{outline:3px solid #ffd27a;outline-offset:2px}
 // ---- what to ask (all from the link the bot sent) ----
 // k: question key · kind: time (clock times, axis in hours) | dur (minutes) · q: question · lo/hi: axis range
 const P = new URLSearchParams(location.search);
-const KIND = P.get('kind') === 'dur' ? 'dur' : 'time';
+const KIND = ['dur', 'days'].includes(P.get('kind')) ? P.get('kind') : 'time';   // time 钟点 · dur 分钟 · days 天
 const KEY = P.get('k') || 'test';
 const IDX = P.get('i');            // 词的序号：结果通过 t.me/<bot>?start=iv_<序号>_<下限>_<上限> 带回 bot
 const BOT = P.get('bot');
+const PFX = ['ic', 'id'].includes(P.get('p')) ? P.get('p') : 'iv';   // iv 时间词 · ic 某类事一次做多久 · id 一般几天做完
 const LO = +(P.get('lo') || (KIND === 'time' ? 6 : 0));
 const HI = +(P.get('hi') || (KIND === 'time' ? 24 : 120));
 if (P.get('q')) document.getElementById('q').textContent = P.get('q');
@@ -69,9 +70,10 @@ let W = 0, H = 0, DPR = 1;
 const PADX = 18, AXIS_Y = () => Math.round(H / 2);
 const toX = v => PADX + (v - LO) / (HI - LO) * (W - 2 * PADX);
 const toV = x => LO + (x - PADX) / (W - 2 * PADX) * (HI - LO);
-const STEP = KIND === 'time' ? 0.25 : (HI - LO > 180 ? 15 : 5);    // snap: 15 min for clock times, 5/15 min for durations
+const STEP = KIND === 'time' ? 0.25 : KIND === 'days' ? 1 : (HI - LO > 180 ? 15 : 5);    // snap: 15 min for clock times, 5/15 min for durations
 const snap = v => Math.min(HI, Math.max(LO, Math.round(v / STEP) * STEP));
 const fmt = v => {
+  if (KIND === 'days') return `${v} 天`;
   if (KIND === 'time') { const h = Math.floor(v + 1e-9), m = Math.round((v - h) * 60); if (h === 24 && m === 0) return '24:00'; return (h >= 24 ? '次日 ' : '') + `${h % 24}:${String(m).padStart(2, '0')}`; }  // 25 = 1am
   if (v < 60) return `${v} 分钟`;
   const h = Math.floor(v / 60), m = v % 60; return m ? `${h} 小时 ${m} 分` : `${h} 小时`;
@@ -89,6 +91,7 @@ function resize() {
 
 function ticks() {
   const out = [];
+  if (KIND === 'days') { const s = (HI - LO) > 14 ? 5 : 1; for (let v = Math.ceil(LO / s) * s; v <= HI; v += s) out.push(v); return out; }
   if (KIND === 'time') { const s = (HI - LO) > 12 ? 2 : 1; for (let v = Math.ceil(LO / s) * s; v <= HI; v += s) out.push(v); }
   else { const span = HI - LO, s = span > 240 ? 60 : span > 90 ? 30 : 15; for (let v = Math.ceil(LO / s) * s; v <= HI; v += s) out.push(v); }
   return out;
@@ -104,9 +107,9 @@ function draw() {
   for (const v of ticks()) {
     const x = Math.round(toX(v)) + .5;
     g.beginPath(); g.moveTo(x, ay - 5); g.lineTo(x, ay + 5); g.stroke();
-    g.fillText(KIND === 'time' ? String(v % 24) : (v < 60 ? String(v) : `${Math.floor(v / 60)}h` + (v % 60 ? String(v % 60) : '')), x, ay + 20);
+    g.fillText(KIND === 'days' ? String(v) : KIND === 'time' ? String(v % 24) : (v < 60 ? String(v) : `${Math.floor(v / 60)}h` + (v % 60 ? String(v % 60) : '')), x, ay + 20);
   }
-  if (KIND === 'dur') { g.textAlign = 'right'; g.fillText('分钟', W - 2, 14); }
+  if (KIND !== 'time') { g.textAlign = 'right'; g.fillText(KIND === 'days' ? '天' : '分钟', W - 2, 14); }
   // the loop exactly as drawn (closed once the finger lifts)
   const pts = drawing ? stroke : (result ? result.path : []);
   if (pts.length > 1) {
@@ -172,7 +175,7 @@ function send() { if (result) out({ k: KEY, kind: KIND, lo: result.lo, hi: resul
 function out(data) {
   // 钟点按刻钟（×4）、时长按分钟，编成整数放进 start 参数（只能用字母数字和下划线）
   const scale = KIND === 'time' ? 4 : 1;
-  const payload = data.skip ? `iv_${IDX}_s` : `iv_${IDX}_${Math.round(data.lo * scale)}_${Math.round(data.hi * scale)}`;
+  const payload = data.skip ? `${PFX}_${IDX}_s` : `${PFX}_${IDX}_${Math.round(data.lo * scale)}_${Math.round(data.hi * scale)}`;
   window.__sent = payload;
   if (tg && BOT && IDX !== null) {
     tg.openTelegramLink(`https://t.me/${BOT}?start=${payload}`);   // 回到聊天，bot 收到 /start iv_...
