@@ -450,6 +450,16 @@ function sprite(pose, f) {
     p(3, 4, 4, 3, CB); p(6, 5, 1, 3, CL);                                  // torso, belly
     p(7, 4, 4, 1, CB); p(7, 5, 2, 1, CB); p(11, 4, 1, 1, CL);              // front legs + paw over the rim
     head(5, f);                                                            // dips in and out
+  } else if (pose === 'startle') {         // spooked: back arched, legs stiff, tail straight up and puffed out
+    p(0, 0, 3, 3, CB); p(0, 3, 2, 3, CB); p(1, 0, 1, 1, CD); p(0, 2, 1, 1, CD); p(2, 1, 1, 1, CD);   // fat, bristling tail, straight up
+    p(2, 5, 7, 4, CB); p(3, 3, 5, 2, CB); p(4, 4, 1, 2, CD); p(6, 4, 1, 2, CD); p(3, 8, 5, 1, CL);    // arched back
+    [2, 7].forEach(l => { p(l, 9, 1, 1, CB); p(l, 10, 1, 1, CL); });
+    head(7, 2 + f);
+  } else if (pose === 'loaf') {            // lying on the floor, awake (the sleep loaf with open eyes)
+    p(1, 6, 10, 5, CB); p(2, 5, 8, 1, CB);
+    p(3, 6, 1, 2, CD); p(5, 6, 1, 2, CD); p(1, 10, 9, 1, CD);
+    p(7, 6, 5, 4, CB); p(7, 5, 1, 1, CB); p(11, 5, 1, 1, CB); p(10, 7, 1, 1, CE); p(9, 8, 2, 1, CL); p(11, 8, 1, 1, CN);
+    if (f) p(10, 7, 1, 1, CB);             // blink
   } else if (pose === 'groom') {
     sit();
     if (f) { head(7, 2, 'closed'); p(9, 6, 2, 1, CL); } else { head(7, 1, 'closed'); p(9, 4, 2, 2, CL); }
@@ -484,7 +494,7 @@ const I18N = {
   zh: { title: '猫猫小屋', sub: '初夏 · 晴', routine: '猫猫的作息', breakfast: '早饭', lunch: '午饭', dinner: '晚饭',
         bed: '睡觉', groom: '舔毛', random: '随机', about: '约 ', preview: '时间预览', back: '回到现在', now: '现在',
         cat: '猫猫', walking: '猫猫正在走过去…', sleep: '在床上睡觉，晚安', eat: n => `在吃${n}`, wait: n => `蹲在碗边等${n}`,
-        playing: { yarn: '在追毛线球！', wand: '在扑逗猫棒上的羽毛！', box: '钻进了纸箱，只露出一个脑袋', bubble: '在拍泡泡', fireworks: '坐在书房窗台上看烟花 🎆',
+        playing: { yarn: '在追毛线球！', wand: '在扑逗猫棒上的羽毛！', box: '钻进了纸箱，只露出一个脑袋', bubble: '在拍泡泡', fireworks: () => playElapsed() < FW_START ? '趴在书房地上发呆' : playElapsed() < FW_START + 1.9 ? '被第一声烟花吓了一跳！尾巴都炸毛了' : '壮着胆子跳上书房窗台看烟花 🎆',
           tree: '爬到了外面的树上，坐在树梢吹风 ✨', roof: '跑上了屋顶，舔舔毛、打个盹 ✨',
           butterfly: '在草地上追蝴蝶 ✨', pounce: sea => sea === 'winter' ? '在雪地里扑雪堆 ✨' : '在草丛里扑小虫子 ✨',
           steal: () => playElapsed() >= 48 ? '偷吃完了，跳回椅子上若无其事地舔毛 😼' : `跳上餐桌，在偷吃你的${({ sushi: '三文鱼寿司', fishchips: '炸鱼薯条', chicken: '炸鸡', pizza: '披萨', ramen: '拉面' })[playFood]}外卖！😼` },
@@ -496,7 +506,7 @@ const I18N = {
   en: { title: 'Cat Cottage', sub: 'Early summer · Sunny', routine: "The cat's day", breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
         bed: 'Bedtime', groom: 'Grooming', random: 'Random', about: '~', preview: 'Preview time', back: 'Back to now', now: 'Now',
         cat: 'The cat ', walking: 'The cat is on its way…', sleep: 'is asleep in bed. Good night', eat: n => `is having ${n.toLowerCase()}`,
-        playing: { yarn: 'is chasing a ball of yarn!', wand: 'is pouncing on the feather wand!', box: 'has squeezed into a box, only its head poking out', bubble: 'is batting at bubbles', fireworks: 'is on the study windowsill watching fireworks 🎆',
+        playing: { yarn: 'is chasing a ball of yarn!', wand: 'is pouncing on the feather wand!', box: 'has squeezed into a box, only its head poking out', bubble: 'is batting at bubbles', fireworks: () => playElapsed() < FW_START ? 'is lying on the study floor, daydreaming' : playElapsed() < FW_START + 1.9 ? 'jumped at the first firework bang! Tail all puffed up' : 'has bravely hopped onto the study windowsill to watch the fireworks 🎆',
           tree: 'has climbed the tree outside and is enjoying the breeze ✨', roof: 'is up on the roof, grooming and dozing ✨',
           butterfly: 'is chasing a butterfly across the lawn ✨', pounce: sea => sea === 'winter' ? 'is pouncing on snow piles ✨' : 'is pouncing on bugs in the grass ✨',
           steal: () => playElapsed() >= 48 ? 'has polished it all off and is innocently washing on the chair 😼' : `has jumped on the table and is stealing your ${({ sushi: 'salmon sushi', fishchips: 'fish and chips', chicken: 'fried chicken', pizza: 'pizza', ramen: 'ramen' })[playFood]} takeaway! 😼` },
@@ -659,6 +669,7 @@ function drawFood(food, ate, t) {
 
 // ---- fireworks (night only; the bot picks it only after dark) ----
 let fwFlash = null; // [colour, strength] of the freshest burst, tints the window panes
+const FW_START = 3;  // the first few seconds are quiet, so the cat can be startled by the first bang
 function drawFireworks(t) {
   fwFlash = null;
   const COLS = ['#ff6f91', '#ffd27a', '#8fd6ff', '#b8f08a', '#c9a0f0', '#ff9a5a'];
@@ -815,7 +826,19 @@ function drawPlay(kind, t) {
     if (look) { L(pos[0] - HX + 6, -2 + pos[1] - HY, 1, 3, '#ffffff'); L(pos[0] - HX + 6, 2 + pos[1] - HY, 1, 1, '#ffffff'); } // "!"
     return pos;
   }
-  if (kind === 'fireworks') return drawCat(119, 25, 1, 'sit', 0, 1);   // sitting on the study windowsill
+  if (kind === 'fireworks') {  // [sensitive] lying on the study floor → first bang: startled, tail puffed → hops up to the sill to watch
+    const pe = playElapsed(), FX = 113, FY = 42, SX = 119, SY = 25;
+    if (pe < FW_START + 0.1) return drawCat(FX, FY, 1, 'loaf', (t % 4) > 3.8 ? 1 : 0, 1);
+    if (pe < FW_START + 1.1) {   // startled: a little jump on the spot, then a shiver
+      const k = pe - FW_START - 0.1, up = k < 0.3 ? Math.sin(k / 0.3 * Math.PI) * 4 : 0, shake = k >= 0.3 ? (Math.floor(t * 20) % 2) : 0;
+      return drawCat(FX + shake, FY - up, 1, 'startle', 0, 1);
+    }
+    if (pe < FW_START + 1.9) {   // hop up to the windowsill
+      const k = (pe - FW_START - 1.1) / 0.8;
+      return drawCat(FX + (SX - FX) * k, FY + (SY - FY) * k - Math.sin(k * Math.PI) * 8, 1, 'walk', 0, 1);
+    }
+    return drawCat(SX, SY, 1, 'sit', 0, 1);   // sitting on the study windowsill, watching
+  }
   if (kind === 'yarn') {           // the ball rolls off in random directions at random speeds, sometimes stopping
     const [bx, v] = wander(11, t, 74, 106, 0.45, 2.2, 0.15);
     if (Math.abs(v) > 2) yarnDir = v > 0 ? 1 : -1;
@@ -958,7 +981,7 @@ function frame(ts) {
   const bedLamp = lightsOn;
 
   drawSky(m, t);
-  if (playing && playKind === 'fireworks') drawFireworks(t); else fwFlash = null;
+  if (playing && playKind === 'fireworks' && playElapsed() >= FW_START) drawFireworks(playElapsed() - FW_START); else fwFlash = null;
   drawLand(m, t); drawRoof(t);
   L(0, 0, 180, 96, '#5c3d29'); L(0, 0, 180, 1, '#7a5236');
   bedroom(m, bedLamp); study(m, lightsOn); kitchen(m, lightsOn, !!st.food); bathroom();
