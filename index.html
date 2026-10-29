@@ -499,7 +499,9 @@ const I18N = {
           butterfly: '在草地上追蝴蝶 ✨', pounce: sea => sea === 'winter' ? '在雪地里扑雪堆 ✨' : '在草丛里扑小虫子 ✨',
           steal: () => playElapsed() >= 48 ? '偷吃完了，跳回椅子上若无其事地舔毛 😼' : `跳上餐桌，在偷吃你的${({ sushi: '三文鱼寿司', fishchips: '炸鱼薯条', chicken: '炸鸡', pizza: '披萨', ramen: '拉面' })[playFood]}外卖！😼` },
         left: s => `（还剩 ${s} 秒）`,
-        party: ['🎉 今天的任务全部完成！小屋挂上了彩旗', '🎉 今天的任务全部完成！餐桌上多了一束向日葵', '🎉 今天的任务全部完成！椅子上绑了一串气球'],
+        party: ['🎉 今天的任务全部完成！小屋挂上了彩旗', '🎉 今天的任务全部完成！餐桌上多了一束向日葵', '🎉 今天的任务全部完成！椅子上绑了一串气球',
+          '🎉 今天的任务全部完成！餐桌上多了一个小蛋糕', '🎉 今天的任务全部完成！卧室里挂起了一串小灯', '🎉 今天的任务全部完成！厨房里撒满了彩色纸屑',
+          '🎉 今天的任务全部完成！卧室地毯上多了一个礼物盒', '🎉 今天的任务全部完成！书房挂上了两盏红灯笼', '🎉 今天的任务全部完成！餐桌上摆了一整条烤鱼大餐（稀有！）'],
         grooming: '在舔毛，认真打理自己', toilet: '上厕所', toiletWhen: '每天 4 次',
         pee: '在马桶上小便', poo: '在马桶上大便，请勿打扰', flush: '冲完马桶了，很讲卫生',
         aria: '像素风小房子：卧室、书房、厨房餐厅和卫生间，一只橘猫在屋里活动' },
@@ -511,7 +513,9 @@ const I18N = {
           butterfly: 'is chasing a butterfly across the lawn ✨', pounce: sea => sea === 'winter' ? 'is pouncing on snow piles ✨' : 'is pouncing on bugs in the grass ✨',
           steal: () => playElapsed() >= 48 ? 'has polished it all off and is innocently washing on the chair 😼' : `has jumped on the table and is stealing your ${({ sushi: 'salmon sushi', fishchips: 'fish and chips', chicken: 'fried chicken', pizza: 'pizza', ramen: 'ramen' })[playFood]} takeaway! 😼` },
         left: s => ` (${s}s left)`,
-        party: ["🎉 All of today's tasks done! Bunting is up in the cottage", "🎉 All of today's tasks done! Sunflowers on the dining table", "🎉 All of today's tasks done! Balloons tied to a chair"],
+        party: ["🎉 All of today's tasks done! Bunting is up in the cottage", "🎉 All of today's tasks done! Sunflowers on the dining table", "🎉 All of today's tasks done! Balloons tied to a chair",
+          "🎉 All of today's tasks done! A little cake on the dining table", "🎉 All of today's tasks done! Fairy lights in the bedroom", "🎉 All of today's tasks done! Confetti all over the kitchen",
+          "🎉 All of today's tasks done! A gift box on the bedroom rug", "🎉 All of today's tasks done! Two red lanterns in the study", "🎉 All of today's tasks done! A whole grilled fish feast on the table (rare!)"],
         wait: n => `is waiting by the bowl for ${n.toLowerCase()}`, grooming: 'is grooming, very thoroughly',
         toilet: 'Toilet', toiletWhen: '4 times a day', pee: 'is having a wee on the toilet',
         poo: 'is doing a number two. Privacy, please', flush: 'has flushed. Very tidy',
@@ -915,7 +919,13 @@ function isParty(d) {
   else { try { if (localStorage.getItem('cat-clear') === today) partyOn = true; } catch (e) {} }
   return partyOn;
 }
-// 当天限定装饰：0 彩旗 / 1 向日葵 / 2 气球（按日期轮换，和 bot 的 cat.py 一致）
+// 当天限定装饰：0 彩旗 / 1 向日葵 / 2 气球 / 3–8 新的几种（每天按权重抽一种，和 bot 的 cat.py decor_of 完全一致）
+const DECOR_W = [12, 12, 12, 12, 12, 12, 12, 11, 5];
+function decorFor(seed) {
+  let h = (Math.imul(seed, 2654435761) >>> 0) % 100;
+  for (let i = 0; i < DECOR_W.length; i++) { if (h < DECOR_W[i]) return i; h -= DECOR_W[i]; }
+  return 0;
+}
 function drawDecor(kind, t) {
   if (kind === 0) { // bunting across both upstairs rooms
     const COLS = ['#e8584a', '#f2c46d', '#6f9fd8', '#9bbb59', '#c9a0f0'];
@@ -931,6 +941,37 @@ function drawDecor(kind, t) {
     L(87, 63, 1, 8, '#4f9a4a'); L(89, 65, 1, 6, '#4f9a4a'); L(85, 67, 2, 1, '#4f9a4a');
     L(85, 60, 5, 4, '#f7c531'); L(86, 59, 3, 6, '#f7c531'); L(86, 61, 3, 2, '#7a4a20');
     L(89, 63, 4, 3, '#f7c531'); L(90, 62, 2, 5, '#f7c531'); L(90, 63, 2, 2, '#7a4a20');
+  } else if (kind === 3) { // little cake with a flickering candle on the dining table
+    L(86, 72, 8, 4, '#f6e3c8'); L(86, 71, 8, 1, '#f4a6b8'); L(87, 74, 6, 1, '#e07f6a');
+    L(89, 68, 1, 3, '#6f9fd8');
+    L(89, (reduced || Math.floor(t * 4) % 2) ? 66 : 67, 1, 2, '#ffcf4a');
+  } else if (kind === 4) { // fairy lights along the bedroom wall, twinkling
+    const COLS = ['#ffd27a', '#ff9fb0', '#a8e0ff', '#c6f2a0'];
+    for (let x = 4; x < 87; x++) { const sag = Math.round(3 * Math.sin(Math.PI * (x - 4) / 83)); L(x, 3 + sag, 1, 1, '#5a4a3a'); }
+    for (let x = 7, i = 0; x < 85; x += 6, i++) {
+      const sag = Math.round(3 * Math.sin(Math.PI * (x - 4) / 83)), on = reduced || (Math.floor(t * 2) + i) % 3 !== 0;
+      L(x, 4 + sag, 2, 2, on ? COLS[i % 4] : '#8a7a6a');
+    }
+  } else if (kind === 5) { // confetti on the kitchen floor, a few pieces still drifting down
+    const COLS = ['#e8584a', '#f2c46d', '#6f9fd8', '#9bbb59', '#c9a0f0'];
+    for (let i = 0; i < 26; i++) { const x = 16 + (i * 37) % 104, y = 88 + (i * 7) % 2; if (x < 46 || x > 57) L(x, y, 1, 1, COLS[i % 5]); }
+    if (!reduced) for (let i = 0; i < 6; i++) { const p = (t / 6 + i / 6) % 1; L(20 + i * 17 + Math.round(Math.sin(p * 9 + i) * 2), 52 + p * 35, 1, 1, COLS[i % 5]); }
+  } else if (kind === 6) { // gift box on the bedroom rug
+    L(52, 36, 8, 5, '#c9a0f0'); L(52, 36, 8, 1, '#dbbcf6'); L(55, 36, 2, 5, '#f2c46d'); L(52, 38, 8, 1, '#f2c46d');
+    L(53, 34, 2, 2, '#f2c46d'); L(57, 34, 2, 2, '#f2c46d'); L(55, 35, 2, 1, '#e0a83a');
+  } else if (kind === 7) { // two red lanterns hanging in the study, glowing after dark
+    [121, 143].forEach((x, i) => {
+      const sw = reduced ? 0 : Math.round(Math.sin(t * 1.2 + i) * 0.6);
+      L(x, 2, 1, 4, '#3a2a1a');
+      L(x - 2 + sw, 7, 5, 5, '#d9442f'); L(x - 1 + sw, 6, 3, 7, '#d9442f'); L(x - 2 + sw, 9, 5, 1, '#f2c46d');
+      L(x - 1 + sw, 6, 3, 1, '#8a3a22'); L(x - 1 + sw, 12, 3, 1, '#8a3a22'); L(x + sw, 13, 1, 2, '#f2c46d');
+      if (night > 0.4) { g.globalAlpha = 0.25; L(x - 4 + sw, 5, 9, 10, '#ffb070'); g.globalAlpha = 1; }
+    });
+  } else if (kind === 8) { // rare: a whole grilled fish feast on the dining table
+    L(102, 75, 11, 1, '#f4f4f4'); L(103, 74, 9, 1, '#e8e0d0');
+    L(104, 72, 6, 2, '#e0a050'); L(105, 71, 4, 1, '#c88238'); L(110, 71, 2, 4, '#e0a050'); L(104, 72, 1, 1, '#2a1d14');
+    L(106, 72, 1, 2, '#a86a2a'); L(108, 72, 1, 2, '#a86a2a');
+    if (!reduced) { const p = (t / 2.2) % 1; g.globalAlpha = (1 - p) * 0.5; L(106 + Math.round(Math.sin(p * 6)), 70 - p * 6, 1, 1, '#ffffff'); g.globalAlpha = 1; }
   } else { // balloons tied to the left dining chair, bobbing gently
     const bob = reduced ? 0 : Math.round(Math.sin(t * 1.5));
     [[66, 55, '#e8584a'], [71, 52, '#6f9fd8'], [76, 56, '#f2c46d']].forEach(([x, y, c], i) => {
@@ -989,7 +1030,7 @@ function frame(ts) {
   drawLand(m, t); drawRoof(t);
   L(0, 0, 180, 96, '#5c3d29'); L(0, 0, 180, 1, '#7a5236');
   bedroom(m, bedLamp); study(m, lightsOn); kitchen(m, lightsOn, !!st.food); bathroom();
-  const party = isParty(d), decor = seed % 3;
+  const party = isParty(d), decor = decorFor(seed);
   if (party) drawDecor(decor, t);
 
   const pose = playing ? 'play' : (cat.walking ? 'walk' : st.pose);
